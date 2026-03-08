@@ -4,7 +4,7 @@
 
 ---
 
-## M01 — Project Foundation & Infrastructure Setup
+## ✅ M01 — Project Foundation & Infrastructure Setup
 
 - **Goal:** Establish the project skeleton, install all dependencies, and configure core infrastructure so that feature development can begin on a stable base.
 - **Covers PRD Sections:** §5 (System Architecture Overview), §13 (Tech Stack)
@@ -21,7 +21,7 @@
 
 ### Tasks
 
-#### 🚧 M01-T01 — Update Next.js Configuration for Turbopack and Cache Components
+#### ✅ M01-T01 — Update Next.js Configuration for Turbopack and Cache Components
 
 - **Type:** Config
 - **Description:** Enable Turbopack as the dev bundler and activate the `cacheComponents` experimental flag in `next.config.ts`. This unlocks the `'use cache'` directive, `cacheTag()`, and `cacheLife()` primitives required by the caching strategy (PRD §14). Turbopack is required for fast HMR during development (PRD §13).
@@ -37,7 +37,7 @@
 
 ---
 
-#### 🚧 M01-T02 — Create Environment Variables Template
+#### ✅ M01-T02 — Create Environment Variables Template
 
 - **Type:** Config
 - **Description:** Create `.env.local` (gitignored, actual values) and `.env.example` (committed, placeholder keys) files containing all environment variables required by the project. This establishes the single reference for all service credentials and connection strings needed across Clerk, Supabase, Uploadthing, and the app itself.
@@ -53,7 +53,7 @@
 
 ---
 
-#### 🚧 M01-T03 — Adopt src/ Directory Structure and Update Path Aliases
+#### ✅ M01-T03 — Adopt src/ Directory Structure and Update Path Aliases
 
 - **Type:** Config
 - **Description:** Move the existing `app/` directory into `src/app/` and update `tsconfig.json` path aliases from `@/*: ["./*"]` to `@/*: ["./src/*"]` to match the PRD §13 code architecture. This resolves the ⚠️ DIVERGES FROM PRD divergence flagged in AGENTS.md and establishes the canonical directory layout for the rest of the project.
@@ -69,7 +69,7 @@
 
 ---
 
-#### 🚧 M01-T04 — Install and Configure Prisma ORM
+#### ✅ M01-T04 — Install and Configure Prisma ORM
 
 - **Type:** Config
 - **Description:** Install Prisma Client v7.2+ and Prisma CLI. Initialize the Prisma project with `prisma init` to generate the `prisma/` directory and a blank `schema.prisma` file configured for PostgreSQL. Create a reusable Prisma Client singleton at `src/lib/db.ts` to avoid multiple client instances in development.
@@ -86,7 +86,7 @@
 
 ---
 
-#### 🚧 M01-T05 — Provision Supabase Database and Configure Connection
+#### ✅ M01-T05 — Provision Supabase Database and Configure Connection
 
 - **Type:** Config
 - **Description:** Provision a PostgreSQL database on Supabase for the PMA project. Configure the connection string in `.env.local` using both the pooled URL (`DATABASE_URL` via PgBouncer) and direct URL (`DIRECT_URL` for migrations). Verify the Prisma-to-Supabase connection works end-to-end.
@@ -103,7 +103,7 @@
 
 ---
 
-#### 🚧 M01-T06 — Install and Configure Clerk Authentication SDK
+#### ✅ M01-T06 — Install and Configure Clerk Authentication SDK
 
 - **Type:** Config
 - **Description:** Install the `@clerk/nextjs` package and configure it as the authentication provider. Add the `ClerkProvider` to the root layout, set up Clerk environment variables, and configure the Clerk middleware file. This establishes the auth shell that all protected routes will depend on.
@@ -121,7 +121,7 @@
 
 ---
 
-#### 🚧 M01-T07 — Initialize shadcn/ui with Tailwind CSS 4
+#### ✅ M01-T07 — Initialize shadcn/ui with Tailwind CSS 4
 
 - **Type:** Config
 - **Description:** Initialize the shadcn/ui component library using `npx shadcn@latest init`. Configure it to work with Tailwind CSS 4 (already installed), set the components output path to `src/components/ui/`, and install foundational primitives that will be used across the app: Button, Input, Label, Card, Dialog, Sheet, Tooltip, DropdownMenu, Separator, Skeleton, Avatar, Badge, Tabs, ScrollArea, Select, Textarea.
@@ -138,7 +138,7 @@
 
 ---
 
-#### 🚧 M01-T08 — Install UI and State Management Dependencies
+#### ✅ M01-T08 — Install UI and State Management Dependencies
 
 - **Type:** Config
 - **Description:** Install the remaining frontend libraries specified in the PRD tech stack: Jotai (lightweight client-side state), Framer Motion (page transitions and micro-animations), @dnd-kit/core + @dnd-kit/sortable + @dnd-kit/utilities (drag-and-drop for Kanban and Gantt), and Lucide React (icon library). These are not configured yet — just installed and importable.
@@ -155,7 +155,7 @@
 
 ---
 
-#### 🚧 M01-T09 — Install and Configure Uploadthing
+#### ✅ M01-T09 — Install and Configure Uploadthing
 
 - **Type:** Config
 - **Description:** Install the `uploadthing` and `@uploadthing/react` packages. Create the Uploadthing API route handler at `src/app/api/uploadthing/route.ts` and the core configuration file at `src/lib/uploadthing.ts` defining the allowed file types and size limits. This enables file uploads for company logos and project documents.
@@ -172,7 +172,7 @@
 
 ---
 
-#### 🚧 M01-T10 — Create Project Directory Structure and Placeholder Files
+#### ✅ M01-T10 — Create Project Directory Structure and Placeholder Files
 
 - **Type:** Config
 - **Description:** Create the full directory skeleton defined in PRD §13 and establish all single-source-of-truth placeholder files. Each placeholder must contain a module header comment explaining its purpose and the rule that it is the sole location for its concern. This task cements the project conventions before any feature code is written.
@@ -205,6 +205,99 @@
 - **Priority:** Must Have
 - **Estimated Complexity:** High
 
+### Tasks
+
+#### ✅ M02-T01 — Define Prisma Enums and Core Organizational Models
+
+- **Type:** Schema
+- **Description:** Define the foundation of the Prisma schema including all necessary enums (`Role`, `InvitationStatus`, `ProjectStatus`, `SubPhaseStatus`, `NotificationType`, `TaskDependencyType`) and the core organizational models (`Plan`, `Company`, `Subscription`, `User`, `Unit`, `Invitation`). Ensure `Company` is the root entity and `companyId` scoping is established via relations where applicable. Maintain referential integrity for unit and user scoping.
+- **Acceptance Criteria:**
+  - Enums defined: `Role` (OWNER, ADMIN, USER), `InvitationStatus`, `ProjectStatus`, `SubPhaseStatus`, `NotificationType`, `TaskDependencyType`
+  - Models `Plan`, `Company`, `Subscription`, `User`, `Unit`, `Invitation` are added with correct fields from PRD summary
+  - Relations are correctly mapped (e.g., Unit belongs to Company, User belongs to Unit/Company)
+  - `Company.ownerId` is tracked
+- **PRD Reference:** §10 (Data Models Summary), §6.3, §6.4, §6.5
+- **Depends On:** M01
+- **Complexity:** M
+- **Touches:** `prisma/schema.prisma`
+
+---
+
+#### ✅ M02-T02 — Define Project, Phase, and Production Models
+
+- **Type:** Schema
+- **Description:** Expand the schema to include `Client`, `Project`, `Team`, `TeamMember`, `Phase`, `SubPhase`, `GanttMarker`, `Product`, and `Production` models. These models form the core operational domain. Enforce `companyId` or `unitId` scoping for these entities via relations to ensure tenant isolation.
+- **Acceptance Criteria:**
+  - Models `Client`, `Project`, `Team`, `TeamMember` are defined and related correctly
+  - Models `Phase`, `SubPhase`, `GanttMarker`, `Product`, `Production` are defined with appropriate relations
+  - Financial and progress fields (e.g., `montantHT`, `progress`, `taux`) use appropriate data types (e.g., Float or Decimal)
+  - Required relations (like `projectId` on Phase, `phaseId` on Product) are strictly non-nullable
+- **PRD Reference:** §10, §6.6, §6.7, §6.8, §6.9
+- **Depends On:** M02-T01
+- **Complexity:** M
+- **Touches:** `prisma/schema.prisma`
+
+---
+
+#### ✅ M02-T03 — Define Kanban, Time Tracking, and System Models
+
+- **Type:** Schema
+- **Description:** Define the remaining models for execution tracking (`Task`, `Lane`, `Tag`, `TimeEntry`) and system observability (`Notification`, `ActivityLog`). Ensure robust relational mapping to projects, users, and the root organizational hierarchy to allow role-based access.
+- **Acceptance Criteria:**
+  - Models `Lane`, `Task`, `Tag`, `TimeEntry` are defined
+  - Models `Notification`, `ActivityLog` are defined with target roles, JSON metadata (for ActivityLog), and scoping IDs
+  - Schema validates without error using `npx prisma validate`
+- **PRD Reference:** §10, §6.10, §6.11, §6.12, §6.13
+- **Depends On:** M02-T02
+- **Complexity:** M
+- **Touches:** `prisma/schema.prisma`
+
+---
+
+#### ✅ M02-T04 — Apply Database Migrations and Generate Prisma Client
+
+- **Type:** Config
+- **Description:** Push the finalized schema to the Supabase PostgreSQL database using `npx prisma db push` to sync the physical database schema without creating a formal migration file yet. Check for no compilation issues and generate the Prisma client to ensure strong typing is available to the rest of the application.
+- **Acceptance Criteria:**
+  - `npx prisma db push` completes successfully against the configured Supabase database
+  - Database tables reflect the defined schema accurately
+  - `npx prisma generate` runs and creates the Prisma Client
+- **PRD Reference:** §13 (Tech Stack)
+- **Depends On:** M02-T03
+- **Complexity:** S
+- **Touches:** None (executed via CLI)
+
+---
+
+#### ✅ M02-T05 — Create Database Seed Script for Plans
+
+- **Type:** Logic
+- **Description:** Create a Prisma seed script (`prisma/seed.ts`) to populate the baseline required data. Generate the three subscription tiers (Starter, Pro, Premium) matching the PRD definitions and limits. This ensures all environments start with a standardized set of Plan definitions.
+- **Acceptance Criteria:**
+  - `prisma/seed.ts` exists and uses the Prisma Client
+  - The script upserts the three plans: Starter (maxUnits: 1, maxProjects: 5, maxTasksPerProject: 20, maxMembers: 10), Pro (maxUnits: 5, maxProjects: 30, maxTasksPerProject: 200, maxMembers: 50), and Premium (maxUnits: null, maxProjects: null)
+  - `package.json` contains a `prisma.seed` configuration
+  - Running `npx prisma db seed` successfully populates the `Plan` table in Supabase
+- **PRD Reference:** §6.3 (Plans)
+- **Depends On:** M02-T04
+- **Complexity:** S
+- **Touches:** `prisma/seed.ts`, `package.json`
+
+---
+
+#### ✅ M02-T06 — Sync TypeScript Types with DB Schema
+
+- **Type:** Schema
+- **Description:** Export the necessary TypeScript types that correspond to the generated Prisma models in the single-source-of-truth file, `src/lib/types.ts`.
+- **Acceptance Criteria:**
+  - `src/lib/types.ts` is populated with type aliases deriving from `@prisma/client`
+  - Export common composite types (e.g., `ProjectWithPhases`) anticipated by the features
+  - File compiles without TypeScript errors
+- **PRD Reference:** §13 (Code Architecture)
+- **Depends On:** M02-T04
+- **Complexity:** S
+- **Touches:** `src/lib/types.ts`
+
 ---
 
 ## M03 — Authentication & Onboarding
@@ -221,21 +314,162 @@
 - **Priority:** Must Have
 - **Estimated Complexity:** High
 
+### Tasks
+
+#### ✅ M03-T01 — Create Branded Authentication Pages
+
+- **Type:** UI
+- **Description:** Implement custom Clerk `<SignIn />` and `<SignUp />` components at `/company/sign-in` and `/company/sign-up`. These pages must be styled to match the project's premium glassmorphism aesthetic and handle redirecting users properly after login.
+- **Acceptance Criteria:**
+  - `src/app/company/sign-in/[[...sign-in]]/page.tsx` renders Clerk's SignIn component
+  - `src/app/company/sign-up/[[...sign-up]]/page.tsx` renders Clerk's SignUp component
+  - Pages are accessible and visually aligned with the rest of the application
+- **PRD Reference:** §11.4
+- **Depends On:** None
+- **Complexity:** S
+- **Touches:** `src/app/company/sign-in/[[...sign-in]]/page.tsx`, `src/app/company/sign-up/[[...sign-up]]/page.tsx`
+
 ---
 
-## M04 — Routing, Middleware & Layout Shell
+#### ✅ M03-T02 — Implement Clerk Webhook for User Synchronization
 
-- **Goal:** Implement the routing middleware (`proxy.ts`) and the application layout shell (sidebar, header) so that all protected routes are access-controlled and users land on the correct dashboard for their role.
-- **Covers PRD Sections:** §11 (Page & Route Inventory), §12 (Navigation Sidebar), §7 (NFR-05 through NFR-09 — Security)
-- **Key Deliverables:**
-  - `proxy.ts` middleware handles: route protection (`auth.protect()`), invitation ticket detection, URL normalization (`/sign-in` → `/company/sign-in`), path masking (`/` → `/site`), static asset exclusion
-  - Post-login redirect logic: OWNER → `/company/[companyId]`, ADMIN → `/unite`, USER → `/user/[userId]`, new owner → `/company`, unrecognized → `/unauthorized`
-  - Dynamic sidebar component with three context modes (Company, Unit, User) showing correct menu items per role
-  - Sidebar features: context switcher (OWNER only), collapse/expand with Jotai + localStorage persistence, glassmorphism styling, responsive behavior (Sheet on mobile), user profile footer with role badge
-  - `/unauthorized` page implemented
+- **Type:** API
+- **Description:** Create an API endpoint (`/api/webhooks/clerk`) to receive Clerk webhooks. When a `user.created` event is received, it must insert a corresponding `User` record into the PMA database.
+- **Acceptance Criteria:**
+  - Endpoint `src/app/api/webhooks/clerk/route.ts` exists and verifies Svix signatures
+  - Handling `user.created` creates a new `User` in the database with role `USER` by default, copying `id`, `email`, `name`, and `avatarUrl`
+  - Webhook secret is documented as required in `.env.local`
+- **PRD Reference:** §6.1 (AUTH-07)
+- **Depends On:** M02-T04
+- **Complexity:** M
+- **Touches:** `src/app/api/webhooks/clerk/route.ts`, `src/lib/queries.ts`
+
+---
+
+#### ✅ M03-T03 — Build Onboarding Wizard UI State and Shell
+
+- **Type:** UI
+- **Description:** Create a multi-step form shell at `/onboarding` to handle the 3-step process for new owners (Company Profile → First Unit → Invite Team). Use Jotai or local React state to track progression and temporary data between steps before final submission.
+- **Acceptance Criteria:**
+  - `src/app/onboarding/page.tsx` renders a step indicator and container for the steps
+  - State management allows moving Next/Back between steps without losing entered data
+  - Renders a clean, distraction-free layout appropriate for an onboarding flow
+- **PRD Reference:** §6.1 (AUTH-03)
+- **Depends On:** M03-T01
+- **Complexity:** M
+- **Touches:** `src/app/onboarding/page.tsx`, `src/components/forms/onboarding-wizard.tsx`
+
+---
+
+#### ✅ M03-T04 — Implement Onboarding Step 1 (Company) & Step 2 (Unit) Forms
+
+- **Type:** UI
+- **Description:** Implement the form validations using Zod and React Hook Form for Step 1 (Company Details: Name, Logo via Uploadthing, formJur, NIF, sector, state, address, phone, email) and Step 2 (Unit Details: Name, address, phone, email).
+- **Acceptance Criteria:**
+  - Step 1 form correctly captures and validates company data
+  - Logo upload delegates to Uploadthing and stores the URL in form state
+  - Step 2 form captures and validates the first unit's data
+- **PRD Reference:** §6.1 (Onboarding Steps 1 & 2)
+- **Depends On:** M03-T03
+- **Complexity:** M
+- **Touches:** `src/components/forms/onboarding-step-company.tsx`, `src/components/forms/onboarding-step-unit.tsx`, `src/lib/types.ts`
+
+---
+
+#### ✅ M03-T05 — Complete Onboarding Action & Final Redirection Server Action
+
+- **Type:** Logic
+- **Description:** Implement Step 3 (optional team invites) and the final submission logic. Create a robust, transactional Server Action in `src/lib/queries.ts` that receives the collected onboarding data and provisions the entire tenant.
+- **Acceptance Criteria:**
+  - Step 3 allows entering emails and roles, or skipping
+  - Server action `completeOnboarding()` executes a Prisma transaction that:
+    1. Creates `Company` with the current user as `ownerId`
+    2. Updates the current `User` setting `role = OWNER` and linking `companyId`
+    3. Creates the `Starter` trial `Subscription` (active, 2 months) linked to the company
+    4. Creates the first `Unit` linked to the company
+    5. Redirects to `/company/[companyId]`
+- **PRD Reference:** §6.1 (AUTH-04)
+- **Depends On:** M03-T04
+- **Complexity:** H
+- **Touches:** `src/components/forms/onboarding-step-invite.tsx`, `src/lib/queries.ts`, `src/app/onboarding/page.tsx`
+
+---
+
+### Tasks
+
+#### ✅ M04-T01 — Implement Dynamic Redirection in Middleware (`src/proxy.ts`)
+
+- **Type:** Logic
+- **Description:** Implement advanced redirect logic in `src/proxy.ts`. After a user signs in, the middleware must inspect their session or fetch metadata to redirect them to the correct dashboard: OWNERs to `/company/[companyId]`, ADMINs to `/unite/[unitId]`, and USERs to `/user/[userId]`. New owners awaiting onboarding are sent to `/onboarding`. Handle basic path normalization ($ /$ -> $/site$).
+- **Acceptance Criteria:**
+  - authenticated users without a company/role are consistently redirected to `/onboarding`
+  - Signed-out users are blocked from dashboard paths and redirected to sign-in
+  - Post-login landing logic respects the user's role and associations
+- **PRD Reference:** §11.1
 - **Depends On:** M03
-- **Priority:** Must Have
-- **Estimated Complexity:** High
+- **Complexity:** M
+- **Touches:** `src/proxy.ts`
+
+---
+
+#### ✅ M04-T02 — Build Dashboard Layout Shell & Global State (Jotai)
+
+- **Type:** UI
+- **Description:** Establish the parent layout for all dashboard routes in `src/app/(dashboard)/layout.tsx`. Create a responsive shell with side-by-side Sidebar and Main Content areas. Use Jotai to manage a global `sidebarCollapsedAtom` with localStorage persistence to remember user preference.
+- **Acceptance Criteria:**
+  - `src/app/(dashboard)/layout.tsx` wraps all dashboard sub-pages
+  - Jotai atom `sidebarCollapsedAtom` in `src/store/atoms.ts` persists expansion state
+  - Layout is fully responsive, utilizing a Sheet component for the sidebar on mobile
+- **PRD Reference:** §12 (Navigation Sidebar Layout)
+- **Depends On:** M01-T07, M01-T10
+- **Complexity:** M
+- **Touches:** `src/app/(dashboard)/layout.tsx`, `src/store/atoms.ts`, `src/components/global/sidebar.tsx`
+
+---
+
+#### ✅ M04-T03 — Develop Dynamic Sidebar with Multi-Context Modes
+
+- **Type:** UI
+- **Description:** Build a premium Sidebar in `src/components/global/sidebar.tsx` that supports three context modes: Company, Unit, and Personal. Implement a "Context Switcher" for OWNERS to toggle between their company dashboard and individual units. Apply the project's glassmorphism aesthetic with Framer Motion animations for collapsibility.
+- **Acceptance Criteria:**
+  - Sidebar menu items dynamically change based on current route context (e.g. `/company/*` vs `/unite/*`)
+  - Integration of `ModeSwitcher` for context swapping
+  - Active route highlighting logic is implemented for side menu items
+  - Sidebar footer displays current user profile with role badge
+- **PRD Reference:** §12 (Sidebar Logic)
+- **Depends On:** M04-T02
+- **Complexity:** H
+- **Touches:** `src/components/global/sidebar.tsx`, `src/components/global/mode-switcher.tsx`
+
+---
+
+#### ✅ M04-T04 — Implement Header with breadcrumbs and User Menu
+
+- **Type:** UI
+- **Description:** Build the top header for the dashboard layout in `src/components/global/header.tsx`. Include dynamic breadcrumbs that reflect the navigation path and a custom user profile dropdown. Include a placeholder bell icon for notifications.
+- **Acceptance Criteria:**
+  - Breadcrumbs reflect the current dashboard hierarchy
+  - User profile menu exposes Clerk's sign-out and profile actions
+  - Premium glassmorphism styling applied to the header
+- **PRD Reference:** §11.1, §11.4
+- **Depends On:** M04-T02
+- **Complexity:** M
+- **Touches:** `src/components/global/header.tsx`, `src/components/global/breadcrumbs.tsx`
+
+---
+
+#### ✅ M04-T05 — Create Branded Error & Access Restricted Pages
+
+- **Type:** UI
+- **Description:** Implement custom pages for `/unauthorized` and `/not-found` at their respective paths. Apply the same high-design standards as the onboarding flow to these utility pages, ensuring a cohesive user experience even during failures.
+- **Acceptance Criteria:**
+  - Branded `/unauthorized` page exists for permission errors
+  - `src/app/not-found.tsx` provides a meaningful and beautiful 404 experience
+  - Both pages provide clear "Back to Dashboard" navigation
+- **PRD Reference:** §11.1
+- **Depends On:** M04-T01
+- **Complexity:** S
+- **Touches:** `src/app/unauthorized/page.tsx`, `src/app/not-found.tsx`
 
 ---
 
