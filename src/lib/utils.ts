@@ -5,17 +5,27 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Formats a number as Algerian Dinar (DA) following FR locale rules.
+ * Format: 1 234 567,89 DA
+ */
 export function formatAmount(amount: number) {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("fr-DZ", {
     style: "currency",
-    currency: "USD",
-  }).format(amount);
+    currency: "DZD",
+    currencyDisplay: "code",
+  }).format(amount)
+    .replace("DZD", "DA")
+    .trim();
 }
 
+/**
+ * Formats a date to DD MMM YYYY (e.g., 15 Jan 2026).
+ */
 export function formatDate(date: Date | string) {
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
     month: "short",
-    day: "numeric",
     year: "numeric",
   }).format(new Date(date));
 }

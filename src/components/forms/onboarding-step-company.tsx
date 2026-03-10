@@ -3,7 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useSetAtom } from "jotai";
+import { useSetAtom, useAtomValue } from "jotai";
 import {
   onboardingStepAtom,
   onboardingCompanyAtom,
@@ -27,10 +27,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { UploadDropzone } from "@/lib/uploadthing";
-import { Building2, ArrowRight, ImagePlus, X } from "lucide-react";
-import { useState } from "react";
+import { 
+  Building2, 
+  ArrowRight, 
+  ImagePlus, 
+  X, 
+  AlertCircle, 
+  RefreshCcw 
+} from "lucide-react";
+import { useState, useCallback } from "react";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 const companySchema = z.object({
   name: z.string().min(2, "Company name must be at least 2 characters"),
@@ -72,20 +80,27 @@ const sectors = [
 
 export function OnboardingStepCompany() {
   const setStep = useSetAtom(onboardingStepAtom);
+  const companyData = useAtomValue(onboardingCompanyAtom);
   const setCompanyData = useSetAtom(onboardingCompanyAtom);
-  const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
+  const [logoUrl, setLogoUrl] = useState<string | undefined>(companyData?.logoUrl);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const handleUsePlaceholder = useCallback(() => {
+    setLogoUrl(`https://avatar.vercel.sh/${Math.random()}.png?text=Logo`);
+    setUploadError(null);
+  }, []);
 
   const form = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
     defaultValues: {
-      name: "",
-      email: "",
-      phone: "",
-      address: "",
-      nif: "",
-      formJur: "",
-      sector: "",
-      state: "",
+      name: companyData?.name || "",
+      email: companyData?.email || "",
+      phone: companyData?.phone || "",
+      address: companyData?.address || "",
+      nif: companyData?.nif || "",
+      formJur: companyData?.formJur || "",
+      sector: companyData?.sector || "",
+      state: companyData?.state || "",
     },
   });
 
@@ -141,31 +156,86 @@ export function OnboardingStepCompany() {
                 </button>
               </motion.div>
             ) : (
-              <UploadDropzone
-                endpoint="imageUploader"
-                onClientUploadComplete={(res) => {
-                  if (res?.[0]?.ufsUrl) {
-                    setLogoUrl(res[0].ufsUrl);
-                  }
-                }}
-                onUploadError={(error: Error) => {
-                  console.error("Upload error:", error.message);
-                }}
-                appearance={{
-                  container:
-                    "border-dashed border-2 border-border/40 bg-muted/20 rounded-2xl p-6 hover:border-primary/40 transition-colors cursor-pointer",
-                  label: "text-muted-foreground text-sm",
-                  allowedContent: "text-muted-foreground/60 text-xs",
-                  button:
-                    "bg-primary text-primary-foreground text-sm px-4 py-2 rounded-lg",
-                  uploadIcon: "text-muted-foreground/50",
-                }}
-                content={{
-                  uploadIcon: <ImagePlus className="w-8 h-8 text-muted-foreground/40" />,
-                  label: "Drop your logo here or click to browse",
-                  allowedContent: "PNG, JPG, SVG up to 4MB",
-                }}
-              />
+              <div className="space-y-3">
+                <UploadDropzone
+                  endpoint="imageUploader"
+                  onClientUploadComplete={(res) => {
+                    if (res?.[0]?.ufsUrl) {
+                      setLogoUrl(res[0].ufsUrl);
+                      setUploadError(null);
+                    }
+                  }}
+                  onUploadError={(error: Error) => {
+                    console.error("Upload error:", error.message);
+                    setUploadError(error.message);
+                  }}
+                  appearance={{
+                    container: cn(
+                      "border-dashed border-2 bg-muted/20 rounded-2xl p-6 transition-all cursor-pointer",
+                      uploadError ? "border-destructive/40 bg-destructive/5" : "border-border/40 hover:border-primary/40"
+                    ),
+                    label: "text-muted-foreground text-sm",
+                    allowedContent: "text-muted-foreground/60 text-xs",
+                    button: "bg-primary text-primary-foreground text-sm px-4 py-2 rounded-lg",
+                    uploadIcon: cn(
+                      "transition-colors",
+                      uploadError ? "text-destructive/40" : "text-muted-foreground/50"
+                    ),
+                  }}
+                  content={{
+                    uploadIcon: <ImagePlus className="w-8 h-8" />,
+                    label: uploadError ? "Upload failed" : "Drop your logo here or click to browse",
+                    allowedContent: "PNG, JPG, SVG up to 4MB",
+                  }}
+                />
+
+                <AnimatePresence>
+                  {uploadError && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 flex flex-col gap-3">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="w-5 h-5 text-destructive mt-0.5 shrink-0" />
+                          <div className="space-y-1">
+                            <p className="text-sm font-semibold text-destructive">
+                              Upload Configuration Error
+                            </p>
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                              {uploadError.includes("Invalid token") 
+                                ? "Your UPLOADTHING_TOKEN is invalid. Please set a valid base64 token in .env.local."
+                                : uploadError}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            type="button"
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 text-xs gap-2 border-destructive/20 hover:bg-destructive/10"
+                            onClick={() => setUploadError(null)}
+                          >
+                            <RefreshCcw className="w-3 h-3" /> Retry
+                          </Button>
+                          <Button 
+                            type="button"
+                            variant="secondary" 
+                            size="sm" 
+                            className="h-8 text-xs gap-2"
+                            onClick={handleUsePlaceholder}
+                          >
+                            Use Placeholder Logo
+                          </Button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             )}
           </div>
 

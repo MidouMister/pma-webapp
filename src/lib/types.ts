@@ -100,3 +100,48 @@ export interface TeamInviteData {
   email: string
   role: 'ADMIN' | 'USER'
 }
+
+export type CompanyDashboardData = Prisma.CompanyGetPayload<{
+  include: {
+    units: {
+      include: {
+        _count: {
+          select: {
+            projects: true
+            users: true
+          }
+        }
+      }
+    }
+    subscriptions: {
+      include: {
+        plan: true
+      }
+    }
+  }
+}>
+
+
+export interface BillingData {
+  company: Prisma.CompanyGetPayload<{
+    include: {
+      subscriptions: {
+        include: { plan: true }
+      }
+      _count: {
+        select: {
+          units: true
+          users: true
+        }
+      }
+    }
+  }>
+  subscription: (Prisma.SubscriptionGetPayload<{ include: { plan: true } }>) | null
+  plans: Prisma.PlanGetPayload<object>[]
+  usage: {
+    units: number
+    projects: number
+    members: number
+    tasks: number
+  }
+}

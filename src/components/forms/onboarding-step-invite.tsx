@@ -26,11 +26,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Users, Plus, Trash2, ArrowLeft, Loader2 } from "lucide-react";
+import { Users, Plus, Trash2, ArrowLeft, Loader2, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { completeOnboarding } from "@/lib/queries";
 import { useRouter } from "next/navigation";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const inviteSchema = z.object({
   invites: z.array(
@@ -46,11 +47,14 @@ type InviteFormValues = z.infer<typeof inviteSchema>;
 export function OnboardingStepInvite() {
   const router = useRouter();
   const setStep = useSetAtom(onboardingStepAtom);
+  const setCompanyData = useSetAtom(onboardingCompanyAtom);
+  const setUnitData = useSetAtom(onboardingUnitAtom);
 
   const companyData = useAtomValue(onboardingCompanyAtom);
   const unitData = useAtomValue(onboardingUnitAtom);
 
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const form = useForm<InviteFormValues>({
     resolver: zodResolver(inviteSchema),
@@ -65,9 +69,13 @@ export function OnboardingStepInvite() {
   });
 
   async function handleFinish(values: InviteFormValues) {
-    if (!companyData || !unitData) return;
+    if (!companyData || !unitData) {
+        setError("Missing company or unit data. Please go back and complete the previous steps.");
+        return;
+    }
 
     setIsLoading(true);
+    setError(null);
     try {
       const result = await completeOnboarding({
         company: companyData,
@@ -76,12 +84,27 @@ export function OnboardingStepInvite() {
       });
 
       if (result?.success) {
+        // Clear onboarding state on success
+        setCompanyData(null);
+        setUnitData(null);
+        setStep(1);
+        
+        // Ensure localStorage is cleanly wiped (Jotai might just serialize 'null' or '1' otherwise)
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem("onboarding_step");
+          window.localStorage.removeItem("onboarding_company");
+          window.localStorage.removeItem("onboarding_unit");
+          window.localStorage.removeItem("onboarding_invite");
+        }
+        
         router.push(`/company/${result.companyId}`);
       } else {
+        setError(result?.error || "Failed to complete onboarding");
         console.error("Failed to complete onboarding:", result?.error);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Something went wrong";
+      setError(errorMessage);
       console.error("[Queries] Onboarding Error:", errorMessage);
     } finally {
       setIsLoading(false);
@@ -99,6 +122,27 @@ export function OnboardingStepInvite() {
           <p className="text-sm text-muted-foreground">Add early team members to your first unit (Optional)</p>
         </div>
       </div>
+
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+          >
+            <Alert variant="destructive" className="bg-destructive/5 border-destructive/20 rounded-2xl">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Onboarding Error</AlertTitle>
+              <AlertDescription>
+                {error}
+                <div className="mt-2 text-xs opacity-70">
+                    If this persists, try refreshing the page or checking your internet connection.
+                </div>
+              </AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleFinish)} className="space-y-6">

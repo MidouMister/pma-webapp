@@ -113,6 +113,7 @@
   - `src/middleware.ts` exists with basic Clerk `clerkMiddleware()` configuration
   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` loaded from env
   - `NEXT_PUBLIC_CLERK_SIGN_IN_URL` set to `/company/sign-in` and `NEXT_PUBLIC_CLERK_SIGN_UP_URL` set to `/company/sign-up`
+  - `ClerkProvider` wrapped in `Suspense` inside `body` to support Next.js 16 PPR (Blocking Route fix applied 2026-03-09)
   - App boots without Clerk configuration errors
 - **PRD Reference:** §13 (Tech Stack — Clerk), AUTH-06
 - **Depends On:** M01-T02, M01-T03
@@ -300,9 +301,18 @@
 
 ---
 
-## M03 — Authentication & Onboarding
+### M03: Authentication & Onboarding (✅ Complete & Audited)
 
-- **Goal:** Enable user registration, login, and the first-run onboarding wizard so that new users can create a Company, first Unit, and become the OWNER — the entry point for the entire application.
+**Goal:** Enable user registration, login, and the first-run onboarding wizard.
+
+| Task ID | Type       | Description                                                           | Status      |
+| ------- | ---------- | --------------------------------------------------------------------- | ----------- |
+| M03-T01 | UI/UX      | Create Branded Authentication Pages                                   | ✅ Complete |
+| M03-T02 | Backend    | Implement Clerk Webhook for User Synchronization                      | ✅ Complete |
+| M03-T03 | Frontend   | Build Onboarding Wizard UI State and Shell                            | ✅ Complete |
+| M03-T04 | Frontend   | Implement Onboarding Forms & Validation (incl. State Restoration Fix) | ✅ Complete |
+| M03-T05 | Full-stack | Complete Onboarding Action & Final Redirection (incl. Schema Fixes)   | ✅ Complete |
+
 - **Covers PRD Sections:** §6.1 (Authentication & Onboarding)
 - **Key Deliverables:**
   - Clerk sign-in and sign-up pages at `/company/sign-in` and `/company/sign-up`
@@ -473,7 +483,7 @@
 
 ---
 
-## M05 — Company Management
+## ✅ M05 — Company Management
 
 - **Goal:** Allow the OWNER to manage their company profile and view a high-level company dashboard, providing the administrative foundation for all downstream features.
 - **Covers PRD Sections:** §6.2 (Company Management)
@@ -487,9 +497,55 @@
 - **Priority:** Must Have
 - **Estimated Complexity:** Medium
 
+### Tasks
+
+#### ✅ M05-T01 — Implement the Owner's Company Dashboard (2026-03-09)
+
+- **Type:** UI
+- **Description:** Implement the landing page for company owners at `/company/[companyId]`. This page must display aggregate KPIs (total units, total active projects, total members) and a high-level summary of each unit's performance. Enforce strictly that only the company OWNER can access this route group.
+- **Acceptance Criteria:**
+  - Route `/company/[companyId]` renders a dashboard with aggregate stats
+  - Non-owner users are redirected to `/unauthorized` if they attempt to access `/company/*`
+  - Units are listed with quick links to their respective unit dashboards
+  - Data is fetched using `'use cache'` with appropriate `companyTag`
+- **PRD Reference:** §6.2 (COMP-05)
+- **Depends On:** M04
+- **Complexity:** M
+- **Touches:** `src/app/(dashboard)/company/[companyId]/page.tsx`, `src/lib/queries.ts`
+
 ---
 
-## M06 — Subscription & Plan Enforcement
+#### ✅ M05-T02 — Develop Company Settings & Profile Management (2026-03-09)
+
+- **Type:** UI
+- **Description:** Create the settings page at `/company/[companyId]/settings` for updating core company metadata. This includes name, NIF, legal form, sector, and contact info. Re-use the Uploadthing component for the company logo.
+- **Acceptance Criteria:**
+  - Form validates all fields according to PRD models using Zod
+  - Logo update works and previews before saving
+  - Layout matches the premium "glassmorphism" aesthetic
+- **PRD Reference:** §6.2 (COMP-01, COMP-02)
+- **Depends On:** M05-T01
+- **Complexity:** M
+- **Touches:** `src/app/(dashboard)/company/[companyId]/settings/page.tsx`, `src/components/forms/company-settings-form.tsx`
+
+---
+
+#### ✅ M05-T03 — Implement updateCompany Server Action & Cache Invalidation (2026-03-09)
+
+- **Type:** Logic
+- **Description:** Finalize the `updateCompany` server action in `src/lib/queries.ts`. Implement row-level RBAC to ensure only the owner can trigger the update. Ensure a successful update triggers `updateTag(TAGS.COMPANY(companyId))` to refresh the UI globally.
+- **Acceptance Criteria:**
+  - Server action checks `user.id === company.ownerId` before proceeding
+  - Successful update triggers revalidation for the company tag
+  - Error messages are user-friendly and surface via toast
+- **PRD Reference:** §14.5, §6.2
+- **Depends On:** M05-T02
+- **Complexity:** S
+- **Touches:** `src/lib/queries.ts`
+
+---
+
+## 🚧 M06 — Subscription & Plan Enforcement
 
 - **Goal:** Implement the subscription lifecycle, billing page, plan limit enforcement, and trial expiry logic so that the monetization model is fully operational.
 - **Covers PRD Sections:** §6.3 (Subscription & Plans), §9 (Subscription Enforcement Rules)
@@ -503,6 +559,64 @@
 - **Depends On:** M05
 - **Priority:** Must Have
 - **Estimated Complexity:** High
+
+### Tasks
+
+#### M06-T01 — Implement the Billing & Plan Overview Page
+
+## ✅ M06 — Subscription & Plan Enforcement
+
+- **Goal:** Protect company resources by ensuring usage fits within the active plan, while providing the OWNER with tool to monitor and upgrade as needed.
+- **Covers PRD Sections:** §6.3 (Plan Enforcement), §9 (Plan Limits)
+
+- [x] **M06-T01: Implement the Billing & Plan Overview Page** ✅ 2026-03-09
+  - Create `src/app/(dashboard)/company/[companyId]/settings/billing/page.tsx`
+  - Implement usage progress bars (Units/Projects/Members usage vs. Plan limit)
+  - Display plan comparison table for upgrade requests
+- [x] **M06-T02: Implement Plan Limit Enforcement Logic** ✅ 2026-03-09
+  - Add server-side check helpers in `src/lib/queries.ts` (e.g., `checkPlanLimit`)
+  - Ensure entity creation (Units/Projects) is blocked if limits are reached
+- [x] **M06-T03: Dashboard Logic for Subscription Warnings** ✅ 2026-03-09
+  - Show warning banners in the Company Dashboard if usage > 80% or plan expires soon
+- [x] **M06-T04: Verification & Testing (OWNER View)** ✅ 2026-03-09
+  - Verify layout, icons, and logic for subscription status
+  - `checkPlanLimit` accurately counts active records for the specific entity type
+  - Attempting to create a unit/project/member/task beyond plan limit throws a specific "Plan Limit Reached" error
+  - Grace period (7 days) is respected before locking the system
+- **PRD Reference:** §9 (Subscription Enforcement Rules)
+- **Depends On:** M02, M06-T01
+- **Complexity:** H
+- **Touches:** `src/lib/queries.ts`
+
+---
+
+#### M06-T03 — Develop the "Request Upgrade" Flow
+
+- **Type:** UI/Logic
+- **Description:** Implement a form to request a plan upgrade. Since payments are offline (bank transfer/check), this form must capture the user's requirements and notify the system (for now, log it or create a "BillingRequest" record if we decide to add it, or simply simulate a success state).
+- **Acceptance Criteria:**
+  - Modal or page for upgrade request with plan selection
+  - Form validation for contact details
+  - Success state provides instructions for offline payment
+- **PRD Reference:** §6.3 (PLAN-03)
+- **Depends On:** M06-T01
+- **Complexity:** S
+- **Touches:** `src/components/forms/upgrade-request-form.tsx`, `src/app/(dashboard)/company/[companyId]/settings/billing/page.tsx`
+
+---
+
+#### M06-T04 — Implement Expiry & Grace Period Enforcement
+
+- **Type:** Logic
+- **Description:** Implement the logic to calculate "days remaining" and handle expired subscriptions. Enforce "Read-Only" mode across the dashboard if the subscription is expired AND the grace period has ended.
+- **Acceptance Criteria:**
+  - Countdown timer / days remaining displayed on billing page
+  - Global middleware or HOC blocks mutation actions if subscription is invalid
+  - System remains readable but blocks all create/edit/delete actions after grace period
+- **PRD Reference:** §9 (Expiry & Grace Period)
+- **Depends On:** M06-T02
+- **Complexity:** M
+- **Touches:** `src/lib/queries.ts`, `src/middleware.ts`
 
 ---
 
@@ -519,6 +633,90 @@
 - **Depends On:** M05, M06
 - **Priority:** Must Have
 - **Estimated Complexity:** Medium
+
+### Tasks
+
+#### M07-T01 — Build the Units List Page
+
+- **Type:** UI
+- **Description:** Create the units management page at `/company/[companyId]/units` for the OWNER. Display all units in a responsive card or table layout showing each unit's name, admin name, member count, project count, and creation date. Include "Create Unit" CTA and per-row edit/delete actions.
+- **Acceptance Criteria:**
+  - Route `src/app/(dashboard)/company/[companyId]/units/page.tsx` exists and renders the unit list
+  - Each unit card/row shows: name, admin name, member count, project count
+  - "Create Unit" button opens a dialog/sheet with the unit creation form
+  - Empty state with illustration and CTA when no units exist
+  - Only OWNER can access this route — ADMIN/USER redirected to `/unauthorized`
+- **PRD Reference:** §6.4 (UNIT-06)
+- **Depends On:** M05
+- **Complexity:** M
+- **Touches:** `src/app/(dashboard)/company/[companyId]/units/page.tsx`, `src/lib/queries.ts`
+
+---
+
+#### M07-T02 — Implement Unit CRUD Server Actions
+
+- **Type:** Logic
+- **Description:** Create `createUnit()`, `updateUnit()`, and `deleteUnit()` server actions in `src/lib/queries.ts`. Enforce OWNER-only access on create/delete. ADMIN can update only their own unit. Plan limit check (`maxUnits`) before creation. Cascade delete all child entities (Projects, Phases, Tasks, Lanes, Tags, Clients) when a unit is deleted.
+- **Acceptance Criteria:**
+  - `createUnit()` validates Plan.maxUnits limit before INSERT, assigns adminId
+  - `updateUnit()` allows OWNER for any unit, ADMIN for own unit only
+  - `deleteUnit()` cascades deletion of associated Projects, Phases, Tasks, Lanes, Tags, Clients
+  - Cache invalidation: `createUnit` → `companyTag(companyId)`; `updateUnit` → `unitTag(unitId)`; `deleteUnit` → `companyTag(companyId)`, `unitTag(unitId)`
+  - RBAC enforced server-side — never trusted from client
+- **PRD Reference:** §6.4 (UNIT-01, UNIT-02, UNIT-05), §14.5
+- **Depends On:** M06-T02
+- **Complexity:** H
+- **Touches:** `src/lib/queries.ts`
+
+---
+
+#### M07-T03 — Create Unit Form with Admin Assignment
+
+- **Type:** UI
+- **Description:** Build a Zod-validated form for creating and editing units (fields: name, address, phone, email). Include an admin picker dropdown that lists company members eligible for the ADMIN role. The picker must enforce the one-admin-per-unit constraint.
+- **Acceptance Criteria:**
+  - Form validates all fields using Zod schema
+  - Admin picker shows eligible users (not already admin of another unit)
+  - Edit mode pre-fills existing unit data
+  - Form submits via `createUnit()` or `updateUnit()` server action
+  - Success triggers toast notification and list refresh
+- **PRD Reference:** §6.4 (UNIT-01, UNIT-02, UNIT-03)
+- **Depends On:** M07-T02
+- **Complexity:** M
+- **Touches:** `src/components/forms/unit-form.tsx`
+
+---
+
+#### M07-T04 — Build Unit Dashboard Page
+
+- **Type:** UI
+- **Description:** Create the unit operational dashboard at `/unite/[unitId]`. Display unit-level KPIs (active projects, total members, tasks in progress, production summary), recent activity feed, and a team overview section. This page is accessible by the unit's ADMIN and the OWNER.
+- **Acceptance Criteria:**
+  - Route `src/app/(dashboard)/unite/[unitId]/page.tsx` exists and renders KPI cards
+  - KPIs include: active project count, member count, open tasks count, recent production rates
+  - Recent activity section shows latest ActivityLog entries for the unit
+  - RBAC: OWNER can access any unit dashboard; ADMIN can access only their own
+  - Data fetched with `'use cache'` + `cacheLife("hours")` + `unitTag(id)`
+- **PRD Reference:** §11.6, §6.4 (UNIT-04)
+- **Depends On:** M07-T02
+- **Complexity:** M
+- **Touches:** `src/app/(dashboard)/unite/[unitId]/page.tsx`, `src/lib/queries.ts`
+
+---
+
+#### M07-T05 — Implement Unit Delete Confirmation & Cascade Guard
+
+- **Type:** UI/Logic
+- **Description:** Add a confirmation dialog for unit deletion that warns the OWNER about cascading data loss. Show a summary of what will be deleted (N projects, N tasks, N clients, N members). Require the OWNER to type the unit name to confirm.
+- **Acceptance Criteria:**
+  - Delete button opens a confirmation dialog listing cascade impact
+  - Dialog requires typing the unit name to enable the "Delete" button
+  - On confirmation, calls `deleteUnit()` which cascades all child records
+  - Success navigates back to the units list with a toast
+- **PRD Reference:** §6.4 (UNIT-05)
+- **Depends On:** M07-T02
+- **Complexity:** S
+- **Touches:** `src/components/forms/unit-delete-dialog.tsx`
 
 ---
 
@@ -537,6 +735,92 @@
 - **Priority:** Must Have
 - **Estimated Complexity:** High
 
+### Tasks
+
+#### M08-T01 — Implement Invitation Server Actions
+
+- **Type:** Logic
+- **Description:** Create `sendInvitation()`, `cancelInvitation()`, and `resendInvitation()` server actions in `src/lib/queries.ts`. `sendInvitation()` must call `clerkClient.invitations.create()` with the email and role, store the `clerkInvitationId` in the Invitation model, and enforce that OWNER role cannot be invited. Enforce one active invitation per email per company.
+- **Acceptance Criteria:**
+  - `sendInvitation()` creates a Clerk invitation and a PMA `Invitation` record with status `PENDING`
+  - Inviting as `OWNER` role is explicitly blocked with an error
+  - Duplicate active invitation per email per company is rejected
+  - `cancelInvitation()` revokes the Clerk invitation and sets status to `REJECTED`
+  - `resendInvitation()` re-sends a PENDING invitation via Clerk
+  - Plan limit check for `maxMembers` before sending
+- **PRD Reference:** §6.5 (INV-01 through INV-07)
+- **Depends On:** M07
+- **Complexity:** H
+- **Touches:** `src/lib/queries.ts`
+
+---
+
+#### M08-T02 — Build Company-Wide Team Page
+
+- **Type:** UI
+- **Description:** Create the company team management page at `/company/[companyId]/team`. Display all members across all units with avatar, name, email, role badge, unit assignment, job title, and joined date. Include a section for pending invitations with cancel/resend actions. Add an "Invite Member" button that opens the invitation form.
+- **Acceptance Criteria:**
+  - Route `src/app/(dashboard)/company/[companyId]/team/page.tsx` renders company-wide member list
+  - Members table/list shows: avatar, name, email, role badge, unit, job title, joined date
+  - Pending invitations section with status, cancel, and resend actions
+  - "Invite Member" opens a dialog with unit picker, email input, and role selector
+  - OWNER-only access enforced
+- **PRD Reference:** §6.5 (INV-12), §11.5
+- **Depends On:** M08-T01
+- **Complexity:** M
+- **Touches:** `src/app/(dashboard)/company/[companyId]/team/page.tsx`, `src/components/forms/invite-form.tsx`
+
+---
+
+#### M08-T03 — Build Unit Members Page
+
+- **Type:** UI
+- **Description:** Create the unit member directory at `/unite/[unitId]/users`. Show all members assigned to the unit with avatar, name, email, role badge, job title, and joined date. ADMIN can invite new members to their unit and remove existing members. Include pending invitations section.
+- **Acceptance Criteria:**
+  - Route `src/app/(dashboard)/unite/[unitId]/users/page.tsx` renders the unit member list
+  - ADMIN can invite new members scoped to this unit
+  - ADMIN/OWNER can remove a member from the unit (does not delete the User account)
+  - Removed members lose access to all unit-scoped data
+  - Pending invitations for this unit displayed with cancel/resend actions
+- **PRD Reference:** §6.5 (INV-10, INV-11, INV-12), §11.6
+- **Depends On:** M08-T01
+- **Complexity:** M
+- **Touches:** `src/app/(dashboard)/unite/[unitId]/users/page.tsx`
+
+---
+
+#### M08-T04 — Implement Invitation Acceptance & User Assignment
+
+- **Type:** Logic
+- **Description:** Handle the post-signup flow for invited users. When a user signs up via a Clerk invitation link (`__clerk_ticket`), the middleware and webhook must detect the invitation, update the `Invitation` status to `ACCEPTED`, assign the user to the correct Unit with the invited role, and skip onboarding. Create an `INVITATION` notification for the OWNER.
+- **Acceptance Criteria:**
+  - Invited users bypass `/onboarding` and are assigned directly to their unit
+  - `Invitation.status` transitions to `ACCEPTED` on signup
+  - User is assigned `companyId`, `unitId`, and the invited `role`
+  - OWNER receives an `INVITATION` notification when an invite is accepted
+  - Rejected invitations create a notification as well
+- **PRD Reference:** §6.5 (INV-04, INV-08, INV-09), AUTH-05
+- **Depends On:** M08-T01, M03-T02
+- **Complexity:** H
+- **Touches:** `src/lib/queries.ts`, `src/app/api/webhooks/clerk/route.ts`, `src/middleware.ts`
+
+---
+
+#### M08-T05 — Implement Project Team Management
+
+- **Type:** UI/Logic
+- **Description:** Create `addTeamMember()` and `removeTeamMember()` server actions and a Team management UI panel inside the project detail page. ADMIN/OWNER can add unit members to a project's Team with a project-specific role label. Removing a member revokes their project access.
+- **Acceptance Criteria:**
+  - `addTeamMember()` adds a user to the project's Team with a role label
+  - `removeTeamMember()` removes the user from the project Team
+  - Adding a member sends a `TEAM` notification to the added user
+  - USER can only view projects they are a TeamMember of
+  - Cache invalidation: `projectTeamTag`, `userProjectsTag`, `companyTeamTag`
+- **PRD Reference:** §6.5 (TEAM-01 through TEAM-05), §14.5
+- **Depends On:** M08-T01
+- **Complexity:** M
+- **Touches:** `src/lib/queries.ts`, `src/components/dashboard/project-team-panel.tsx`
+
 ---
 
 ## M09 — Client CRM
@@ -552,6 +836,71 @@
 - **Depends On:** M07
 - **Priority:** Must Have
 - **Estimated Complexity:** Medium
+
+### Tasks
+
+#### M09-T01 — Implement Client CRUD Server Actions
+
+- **Type:** Logic
+- **Description:** Create `createClient()`, `updateClient()`, and `deleteClient()` server actions in `src/lib/queries.ts`. Enforce unit-scoping and RBAC (ADMIN/OWNER only). Deletion guard: block deletion if the client has any projects with status `InProgress`.
+- **Acceptance Criteria:**
+  - `createClient()` creates a client scoped to the unit/company
+  - `updateClient()` validates ADMIN/OWNER access
+  - `deleteClient()` checks for active projects and returns an error if any exist
+  - Cache invalidation: `unitClientsTag(unitId)` on all mutations
+  - Client name uniqueness enforced within unit scope
+- **PRD Reference:** §6.6 (CLT-01 through CLT-07), §14.5
+- **Depends On:** M07
+- **Complexity:** M
+- **Touches:** `src/lib/queries.ts`
+
+---
+
+#### M09-T02 — Build Client List Page
+
+- **Type:** UI
+- **Description:** Create the clients page at `/unite/[unitId]/clients`. Display clients in a searchable, sortable table with columns: name, wilaya, phone, email, total TTC (sum of linked projects' montantTTC), linked project count. Include "Add Client" CTA. USERs see a read-only subset for clients linked to their projects.
+- **Acceptance Criteria:**
+  - Route `src/app/(dashboard)/unite/[unitId]/clients/page.tsx` renders client list
+  - Search by client name (debounced input)
+  - Sort by name or total TTC contract value
+  - Empty state with illustration and CTA
+  - USER sees only clients linked to their assigned projects (read-only)
+- **PRD Reference:** §6.6 (CLT-05, CLT-06)
+- **Depends On:** M09-T01
+- **Complexity:** M
+- **Touches:** `src/app/(dashboard)/unite/[unitId]/clients/page.tsx`
+
+---
+
+#### M09-T03 — Create Client Form
+
+- **Type:** UI
+- **Description:** Build a Zod-validated form for creating/editing clients with fields: name, wilaya, phone, email. Use a Dialog or Sheet for the form. Pre-fill on edit mode.
+- **Acceptance Criteria:**
+  - Form validates all fields (email format, required name)
+  - "Create" and "Edit" modes share the same form component
+  - Successful submission triggers toast and list refresh
+- **PRD Reference:** §6.6 (CLT-02, CLT-03)
+- **Depends On:** M09-T01
+- **Complexity:** S
+- **Touches:** `src/components/forms/client-form.tsx`
+
+---
+
+#### M09-T04 — Build Client Profile Page
+
+- **Type:** UI
+- **Description:** Create a client detail/profile page or expandable panel showing: contact details, all linked projects (name, status, montantTTC), and the total TTC contract value (sum). Include edit and delete actions for ADMIN/OWNER.
+- **Acceptance Criteria:**
+  - Client profile shows contact info and linked projects list
+  - Total TTC calculated as `Σ Project.montantTTC` for linked projects
+  - Delete button shows the active-project guard message if applicable
+  - Premium aesthetic with card layout
+- **PRD Reference:** §6.6 (CLT-04, CLT-07)
+- **Depends On:** M09-T02
+- **Complexity:** M
+- **Touches:** `src/app/(dashboard)/unite/[unitId]/clients/[clientId]/page.tsx`
 
 ---
 
@@ -572,6 +921,93 @@
 - **Priority:** Must Have
 - **Estimated Complexity:** High
 
+### Tasks
+
+#### M10-T01 — Implement Project CRUD Server Actions
+
+- **Type:** Logic
+- **Description:** Create `createProject()`, `updateProject()`, and `deleteProject()` server actions in `src/lib/queries.ts`. On create: validate Plan.maxProjects limit, auto-create an empty Team record, enforce unique `code` within unit. Implement status lifecycle transitions. Calculate and store TVA fields server-side.
+- **Acceptance Criteria:**
+  - `createProject()` checks plan limit, creates project + empty Team in a transaction
+  - `updateProject()` enforces status lifecycle (`New → InProgress → Pause → Complete`)
+  - `deleteProject()` cascades deletion of Phases, SubPhases, Tasks, Team, TimeEntries
+  - Financial auto-calc: `TVA = montantTTC - montantHT`, `TVA% = (TVA / montantHT) × 100`
+  - Cache invalidation per §14.5 mapping
+  - RBAC: ADMIN/OWNER only for mutations
+- **PRD Reference:** §6.7 (PROJ-01 through PROJ-08), §9, §14.5
+- **Depends On:** M08, M09
+- **Complexity:** H
+- **Touches:** `src/lib/queries.ts`
+
+---
+
+#### M10-T02 — Build Project List Page
+
+- **Type:** UI
+- **Description:** Create the projects page at `/unite/[unitId]/projects`. Display projects in a filterable, sortable table/grid with: name, code, client name, status badge, montantTTC (formatted), progress %, ODS date. Include filters (status, client, date range) and sort (date, montantTTC). USERs see only assigned projects.
+- **Acceptance Criteria:**
+  - Route `src/app/(dashboard)/unite/[unitId]/projects/page.tsx` renders project list
+  - Status filter with multi-select (New, InProgress, Pause, Complete)
+  - Client filter dropdown populated from unit's clients
+  - Sort by creation date or montantTTC
+  - "Create Project" button for ADMIN/OWNER
+  - USER sees only projects where they are a TeamMember
+  - Empty state with CTA
+- **PRD Reference:** §6.7 (PROJ-08, PROJ-09)
+- **Depends On:** M10-T01
+- **Complexity:** M
+- **Touches:** `src/app/(dashboard)/unite/[unitId]/projects/page.tsx`
+
+---
+
+#### M10-T03 — Create Project Form
+
+- **Type:** UI
+- **Description:** Build a comprehensive Zod-validated form for creating/editing projects with all required fields: name, code, type, montantHT, montantTTC, ODS date, delai, status, signe (checkbox), clientId (dropdown). Auto-calculate TVA amount and TVA% in real-time as user types HT/TTC.
+- **Acceptance Criteria:**
+  - Form validates all fields including unique code within unit
+  - Client dropdown populated from unit's client list
+  - TVA amount and percentage calculated live as montantHT/TTC change
+  - Monetary inputs formatted as `1 234 567,89 DA`
+  - Edit mode pre-fills existing data with status lifecycle constraint
+- **PRD Reference:** §6.7 (PROJ-02, PROJ-04), §9
+- **Depends On:** M10-T01, M09
+- **Complexity:** M
+- **Touches:** `src/components/forms/project-form.tsx`
+
+---
+
+#### M10-T04 — Build Project Detail Page Shell with Tab Navigation
+
+- **Type:** UI
+- **Description:** Create the project detail page at `/unite/[unitId]/projects/[projectId]` with a tabbed layout. Implement tabs: Overview, Gantt, Production, Tasks, Time Tracking, Documents. Only the Overview tab is fully implemented in this task; other tabs render placeholder shells to be implemented in later milestones.
+- **Acceptance Criteria:**
+  - Route `src/app/(dashboard)/unite/[unitId]/projects/[projectId]/page.tsx` renders with tab navigation
+  - Tabs use URL search params or shadcn/ui Tabs component
+  - Overview tab shows: financials (HT, TTC, TVA), progress bar, team members, client info, dates
+  - Project progress calculated as weighted average of phases
+  - RBAC: OWNER sees all; ADMIN sees own unit; USER sees if TeamMember
+- **PRD Reference:** §6.7 (PROJ-05, PROJ-06)
+- **Depends On:** M10-T01
+- **Complexity:** H
+- **Touches:** `src/app/(dashboard)/unite/[unitId]/projects/[projectId]/page.tsx`, `src/components/dashboard/project-overview.tsx`
+
+---
+
+#### M10-T05 — Implement getProjectById & Data Fetching with Cache
+
+- **Type:** Logic
+- **Description:** Create `getProjectById()`, `getUnitProjects()`, and `getProjectWithDetails()` data-fetching functions in `src/lib/queries.ts` using `'use cache'` directive. Apply appropriate cache tags and cache life profiles per the caching decision map.
+- **Acceptance Criteria:**
+  - `getProjectById()` uses `cacheLife("minutes")` + `projectTag(id)`
+  - `getUnitProjects()` uses `cacheLife("hours")` + `unitProjectsTag(id)`
+  - `getProjectWithDetails()` includes phases, team, client, and computed progress
+  - All functions enforce `companyId` scoping for tenant isolation
+- **PRD Reference:** §14.4, §14.5
+- **Depends On:** M10-T01
+- **Complexity:** M
+- **Touches:** `src/lib/queries.ts`
+
 ---
 
 ## M11 — Phase & Gantt Planning
@@ -589,6 +1025,91 @@
 - **Priority:** Must Have
 - **Estimated Complexity:** High
 
+### Tasks
+
+#### M11-T01 — Implement Phase CRUD Server Actions
+
+- **Type:** Logic
+- **Description:** Create `createPhase()`, `updatePhase()`, and `deletePhase()` server actions. Enforce constraints: `Phase.start ≥ Project.ods`, auto-calculate `duration = (end - start)` in days. Warn if `Σ Phase.montantHT > Project.montantHT`. Auto-calculate Phase progress as average of SubPhase progress when SubPhases exist.
+- **Acceptance Criteria:**
+  - `createPhase()` validates start ≥ Project.ods, auto-calculates duration
+  - `updatePhase()` recalculates duration and progress on save
+  - Budget warning returned when sum of Phase.montantHT exceeds Project.montantHT
+  - Cache invalidation: `projectPhasesTag`, `projectGanttTag`, `projectTag`
+  - RBAC: ADMIN/OWNER only
+- **PRD Reference:** §6.8 (PH-01 through PH-05), §9, §14.5
+- **Depends On:** M10
+- **Complexity:** H
+- **Touches:** `src/lib/queries.ts`
+
+---
+
+#### M11-T02 — Implement SubPhase CRUD & GanttMarker Actions
+
+- **Type:** Logic
+- **Description:** Create SubPhase CRUD actions enforcing that SubPhase dates fall within parent Phase range. Create GanttMarker CRUD (label, date, optional className). When SubPhases change, recalculate parent Phase progress.
+- **Acceptance Criteria:**
+  - SubPhase.start ≥ Phase.start and SubPhase.end ≤ Phase.end
+  - Phase.progress auto-recalculated as average of SubPhase.progress
+  - GanttMarker CRUD with project-scoped access
+  - Cache invalidation: `projectGanttTag`, `projectPhasesTag`
+- **PRD Reference:** §6.8 (PH-06 through PH-10)
+- **Depends On:** M11-T01
+- **Complexity:** M
+- **Touches:** `src/lib/queries.ts`
+
+---
+
+#### M11-T03 — Build Phase Management UI
+
+- **Type:** UI
+- **Description:** Create a Phase form (dialog/sheet) for creating and editing phases with all fields: name, code, montantHT, start date, end date, status, observations, progress slider. Show a warning badge when budget sum exceeds project montantHT. Display phase list on the project detail Gantt tab.
+- **Acceptance Criteria:**
+  - Phase form validates all fields using Zod
+  - Budget warning displayed inline when sum exceeds project montantHT
+  - Duration auto-displayed based on start/end selection
+  - Phase list shows status badges, progress bars, and montantHT
+- **PRD Reference:** §6.8 (PH-01, PH-02, PH-05)
+- **Depends On:** M11-T01
+- **Complexity:** M
+- **Touches:** `src/components/forms/phase-form.tsx`, `src/components/dashboard/phase-list.tsx`
+
+---
+
+#### M11-T04 — Build Interactive Gantt Chart Component
+
+- **Type:** UI
+- **Description:** Build a custom Gantt chart component using HTML/CSS/Canvas or a lightweight library. Render Phases as horizontal bars color-coded by status, SubPhases as nested indented bars, progress fill overlays, and GanttMarkers as vertical dashed lines with diamond icons.
+- **Acceptance Criteria:**
+  - Phases render as horizontal bars with status-based colors
+  - SubPhases nest below parent Phase bars with indentation
+  - Progress % displayed as a fill overlay on each bar
+  - GanttMarkers render as vertical dashed lines with label
+  - Timeline header supports Month / Week / Day zoom levels
+  - Clicking a phase bar opens a Phase detail sheet
+  - Performs smoothly with 50+ phases (PRD NFR-03)
+- **PRD Reference:** §6.8 (GNT-01 through GNT-07), NFR-03
+- **Depends On:** M11-T03
+- **Complexity:** H
+- **Touches:** `src/components/dashboard/gantt-chart.tsx`
+
+---
+
+#### M11-T05 — Integrate Gantt Tab into Project Detail Page
+
+- **Type:** UI
+- **Description:** Wire the Gantt chart component into the project detail page's Gantt tab. Fetch phases, subphases, and markers with cached queries. Add zoom controls and marker management UI.
+- **Acceptance Criteria:**
+  - Gantt tab fully functional on `/unite/[unitId]/projects/[projectId]?tab=gantt`
+  - Zoom controls toggle between Month, Week, Day views
+  - "Add Marker" button for ADMIN/OWNER
+  - Phase bars are clickable → open Phase detail sheet
+  - Data fetched via `getGanttData()` with `cacheLife("minutes")` + `projectGanttTag`
+- **PRD Reference:** §6.8 (GNT-05), §14.4
+- **Depends On:** M11-T04, M10-T04
+- **Complexity:** M
+- **Touches:** `src/app/(dashboard)/unite/[unitId]/projects/[projectId]/page.tsx`
+
 ---
 
 ## M12 — Production Monitoring
@@ -605,6 +1126,71 @@
 - **Depends On:** M11
 - **Priority:** Must Have
 - **Estimated Complexity:** High
+
+### Tasks
+
+#### M12-T01 — Implement Product & Production CRUD Actions
+
+- **Type:** Logic
+- **Description:** Create server actions for Product (planned baseline) and Production (actual recordings). Product is one-per-phase. Production entries auto-calculate `mntProd = Phase.montantHT × (taux / 100)`. Trigger `PRODUCTION` notification when `actual taux < 80% of planned taux`.
+- **Acceptance Criteria:**
+  - `createProduct()` enforces one Product per Phase
+  - `createProduction()` auto-calculates `mntProd` server-side
+  - Underperformance alert triggers PRODUCTION notification for OWNER
+  - Cache invalidation: `phaseProductionTag`, `unitProductionsTag`
+  - RBAC: ADMIN/OWNER only
+- **PRD Reference:** §6.9 (PROD-01 through PROD-08), §9, §14.5
+- **Depends On:** M11
+- **Complexity:** H
+- **Touches:** `src/lib/queries.ts`
+
+---
+
+#### M12-T02 — Build Production Tab Charts
+
+- **Type:** UI
+- **Description:** Implement the Production tab on the project detail page with two charts: (1) a line chart for planned vs actual production rate over time, and (2) a grouped bar chart for planned vs actual produced amounts. Use a charting library (recharts or similar).
+- **Acceptance Criteria:**
+  - Line chart shows planned taux vs actual taux over time
+  - Bar chart shows planned montantProd vs actual mntProd grouped by date
+  - Charts are responsive and follow the premium design aesthetic
+  - Legend, tooltips, and axis labels present
+- **PRD Reference:** §6.9 (PROD-05)
+- **Depends On:** M12-T01, M10-T04
+- **Complexity:** H
+- **Touches:** `src/components/dashboard/production-charts.tsx`
+
+---
+
+#### M12-T03 — Build Production Data Table with Variance
+
+- **Type:** UI
+- **Description:** Create a data table below the charts showing: date, planned taux, actual taux, variance (actual - planned), variance %. Rows where actual < planned are conditionally styled with red background. Include forms for logging new Production entries.
+- **Acceptance Criteria:**
+  - Table shows all production entries with computed variance columns
+  - Red row styling when actual < planned
+  - "Log Production" form for ADMIN/OWNER
+  - Amounts formatted as `1 234 567,89 DA`
+- **PRD Reference:** §6.9 (PROD-06)
+- **Depends On:** M12-T01
+- **Complexity:** M
+- **Touches:** `src/components/dashboard/production-table.tsx`
+
+---
+
+#### M12-T04 — Build Unit-Wide Productions Page
+
+- **Type:** UI
+- **Description:** Create the aggregate production monitoring page at `/unite/[unitId]/productions`. Display cross-phase production summaries, consolidated charts, and variance alerts for all phases in the unit.
+- **Acceptance Criteria:**
+  - Route `src/app/(dashboard)/unite/[unitId]/productions/page.tsx` renders aggregate data
+  - Shows per-phase production summary cards with progress indicators
+  - Underperformance alerts highlighted with warning badges
+  - Data fetched with `cacheLife("minutes")` + `unitProductionsTag`
+- **PRD Reference:** §6.9, §11.6
+- **Depends On:** M12-T02
+- **Complexity:** M
+- **Touches:** `src/app/(dashboard)/unite/[unitId]/productions/page.tsx`
 
 ---
 
@@ -625,6 +1211,109 @@
 - **Priority:** Must Have
 - **Estimated Complexity:** High
 
+### Tasks
+
+#### M13-T01 — Implement Lane CRUD Server Actions
+
+- **Type:** Logic
+- **Description:** Create `createLane()`, `updateLane()`, `reorderLanes()`, and `deleteLane()` server actions. Lanes are unit-scoped and ordered by `Lane.order`. Deleting a lane with tasks unassigns them (`laneId = null`).
+- **Acceptance Criteria:**
+  - `createLane()` creates a lane with next available order value
+  - `updateLane()` supports rename and color change
+  - `reorderLanes()` updates order values for affected lanes
+  - `deleteLane()` prompts confirmation; sets tasks' laneId to null
+  - Cache invalidation: `unitLanesTag(unitId)`, `unitTasksTag(unitId)` on delete
+- **PRD Reference:** §6.10 (LANE-01 through LANE-04), §14.5
+- **Depends On:** M07
+- **Complexity:** M
+- **Touches:** `src/lib/queries.ts`
+
+---
+
+#### M13-T02 — Implement Task CRUD & Move Actions
+
+- **Type:** Logic
+- **Description:** Create `createTask()`, `updateTask()`, `moveTask()`, and `deleteTask()` server actions. Task creation checks `Plan.maxTasksPerProject`. Assigning a task sends a `TASK` notification. `moveTask()` updates `laneId` and `order` efficiently.
+- **Acceptance Criteria:**
+  - `createTask()` checks plan limit before INSERT
+  - `moveTask()` updates laneId and reindexes order in target lane
+  - Assigning task triggers TASK notification to assignee
+  - Overdue detection: `dueDate < NOW && complete = false`
+  - Cache invalidation: `unitTasksTag`, `userTasksTag`
+- **PRD Reference:** §6.10 (TASK-01 through TASK-12), §9, §14.5
+- **Depends On:** M13-T01, M10
+- **Complexity:** H
+- **Touches:** `src/lib/queries.ts`
+
+---
+
+#### M13-T03 — Build Kanban Board UI with Drag-and-Drop
+
+- **Type:** UI
+- **Description:** Create the Kanban board at `/unite/[unitId]/tasks` using `@dnd-kit/core` and `@dnd-kit/sortable`. Render lanes as columns with task cards inside. ADMIN/OWNER can drag any task; USER drags only assigned tasks. Task cards show: title, assignee avatar, due date, tags, overdue badge.
+- **Acceptance Criteria:**
+  - Route `src/app/(dashboard)/unite/[unitId]/tasks/page.tsx` renders the Kanban board
+  - Lanes rendered as columns ordered by `Lane.order`
+  - Task cards display title, assignee, due date, tags, overdue badge
+  - Drag-and-drop between lanes with smooth animations
+  - USER drag restricted to own assigned tasks
+  - Optimistic UI update on drag, with server confirmation
+  - Renders 200 tasks across 10 lanes without degradation (NFR-04)
+- **PRD Reference:** §6.10 (TASK-05 through TASK-08), NFR-04
+- **Depends On:** M13-T02
+- **Complexity:** H
+- **Touches:** `src/app/(dashboard)/unite/[unitId]/tasks/page.tsx`, `src/components/dashboard/kanban-board.tsx`, `src/components/dashboard/task-card.tsx`
+
+---
+
+#### M13-T04 — Build Task Detail Side Sheet
+
+- **Type:** UI
+- **Description:** Create a 480px slide-over panel (Sheet) that opens when a task card is clicked. Display: title, description, status, lane selector, assignee picker, due date picker, tags (add/remove), time entries list, and activity log. Allow inline editing.
+- **Acceptance Criteria:**
+  - Sheet opens on task card click with smooth animation
+  - All task fields editable inline (title, description, assignee, due date, lane)
+  - Tags can be added/removed from the task
+  - Time entries for this task listed with user, duration, description
+  - Activity log section shows recent actions on this task
+  - "Mark Complete" button available per RBAC rules
+- **PRD Reference:** §6.10 (TASK-09, TASK-10, TASK-11)
+- **Depends On:** M13-T03
+- **Complexity:** H
+- **Touches:** `src/components/dashboard/task-detail-sheet.tsx`
+
+---
+
+#### M13-T05 — Implement Tags CRUD
+
+- **Type:** UI/Logic
+- **Description:** Create unit-scoped Tags management: CRUD server actions and a tags management UI. Tags have a name and a color. Tags can be applied to multiple tasks. Add a tag picker to the task form and detail sheet.
+- **Acceptance Criteria:**
+  - `createTag()`, `updateTag()`, `deleteTag()` server actions in queries.ts
+  - Tags are unit-scoped — each unit has independent tags
+  - Tag picker in task form/detail sheet with color swatches
+  - Cache invalidation: `unitTagsTag(unitId)`
+- **PRD Reference:** §6.10 (TASK-12)
+- **Depends On:** M13-T02
+- **Complexity:** S
+- **Touches:** `src/lib/queries.ts`, `src/components/dashboard/tag-picker.tsx`
+
+---
+
+#### M13-T06 — Build Lane Management UI
+
+- **Type:** UI
+- **Description:** Add lane management controls to the Kanban board header: create lane, rename lane, change lane color, reorder lanes (drag column headers), and delete lane with confirmation. Lane color applies as the header accent.
+- **Acceptance Criteria:**
+  - "Add Lane" button creates a new lane with a name and color
+  - Right-click or dropdown on lane header: rename, change color, delete
+  - Delete confirmation warns about tasks becoming unassigned
+  - Lane reorder via drag on column headers
+- **PRD Reference:** §6.10 (LANE-02, LANE-04)
+- **Depends On:** M13-T01
+- **Complexity:** M
+- **Touches:** `src/components/dashboard/kanban-board.tsx`
+
 ---
 
 ## M14 — Time Tracking
@@ -642,6 +1331,72 @@
 - **Priority:** Must Have
 - **Estimated Complexity:** Medium
 
+### Tasks
+
+#### M14-T01 — Implement TimeEntry CRUD Server Actions
+
+- **Type:** Logic
+- **Description:** Create `createTimeEntry()`, `updateTimeEntry()`, and `deleteTimeEntry()` server actions. Auto-calculate `duration = (endTime - startTime)` in minutes. Enforce that USERs can only edit/delete their own entries; OWNER/ADMIN can edit any.
+- **Acceptance Criteria:**
+  - `createTimeEntry()` accepts taskId, projectId (or both), startTime, endTime, description
+  - Duration auto-calculated server-side in minutes
+  - RBAC: USER edits own entries only; ADMIN/OWNER can edit any
+  - Cache invalidation: `projectTimeTag(projectId)`, `userAnalyticsTag(userId)`
+- **PRD Reference:** §6.11 (TIME-01 through TIME-06), §14.5
+- **Depends On:** M13
+- **Complexity:** M
+- **Touches:** `src/lib/queries.ts`
+
+---
+
+#### M14-T02 — Build Manual Time Entry Form
+
+- **Type:** UI
+- **Description:** Create a form for manual time entry with fields: description, start time (datetime picker), end time (datetime picker), task selector, project selector. Auto-calculate and display duration as the user selects times. Accessible from the task detail sheet and the project time tracking tab.
+- **Acceptance Criteria:**
+  - Form validates startTime < endTime
+  - Duration displays in hours:minutes format as user selects times
+  - Task and project selectors populated from unit context
+  - Successful submission triggers toast and list refresh
+- **PRD Reference:** §6.11 (TIME-03, TIME-05)
+- **Depends On:** M14-T01
+- **Complexity:** M
+- **Touches:** `src/components/forms/time-entry-form.tsx`
+
+---
+
+#### M14-T03 — Implement Live Timer Hook & UI
+
+- **Type:** UI/Logic
+- **Description:** Create a `useTimer` custom hook in `src/hooks/useTimer.ts` that manages a live stopwatch. Build a timer UI widget that can be started on a task, shows elapsed time, and on stop auto-fills endTime and calculates duration. Timer state persisted in Jotai atom with localStorage.
+- **Acceptance Criteria:**
+  - `useTimer` hook manages start, stop, reset, and elapsed time state
+  - Timer widget shows running elapsed time in HH:MM:SS
+  - Stopping the timer creates a TimeEntry with auto-filled times
+  - Timer state persists across page navigations (Jotai + localStorage)
+  - Only one timer can run at a time — starting a new one stops the current
+- **PRD Reference:** §6.11 (TIME-04)
+- **Depends On:** M14-T01
+- **Complexity:** M
+- **Touches:** `src/hooks/useTimer.ts`, `src/components/dashboard/timer-widget.tsx`, `src/store/atoms.ts`
+
+---
+
+#### M14-T04 — Build Project Time Tracking Tab
+
+- **Type:** UI
+- **Description:** Implement the Time Tracking tab on the project detail page. Display time entries grouped by user, showing total duration per user per week in a summary table. Include a grand total row. Add ability to log new entries directly from this tab.
+- **Acceptance Criteria:**
+  - Time Tracking tab shows all entries for the project
+  - Entries grouped by user with per-user weekly totals
+  - Grand total displayed at the bottom
+  - "Log Time" button opens the manual entry form
+  - Data fetched via `getTimeEntries()` with `cacheLife("minutes")` + `projectTimeTag`
+- **PRD Reference:** §6.11 (TIME-07), §14.4
+- **Depends On:** M14-T02, M10-T04
+- **Complexity:** M
+- **Touches:** `src/components/dashboard/project-time-tracking.tsx`
+
 ---
 
 ## M15 — User Workspace
@@ -657,6 +1412,92 @@
 - **Depends On:** M13, M14
 - **Priority:** Must Have
 - **Estimated Complexity:** Medium
+
+### Tasks
+
+#### M15-T01 — Build User Dashboard Landing Page
+
+- **Type:** UI
+- **Description:** Create the personal landing page at `/user/[userId]`. Display today's assigned tasks (due today or overdue), active projects summary, unread notifications count badge, and recent time entries. This is the USER's home screen after login.
+- **Acceptance Criteria:**
+  - Route `src/app/(dashboard)/user/[userId]/page.tsx` renders the personal dashboard
+  - "Today's Tasks" section shows tasks due today or overdue with status indicators
+  - Active projects section shows project name, status, and user's team role
+  - Unread notification count displayed with bell badge
+  - Recent time entries listed with task name, duration, date
+  - USER can only access their own workspace; OWNER/ADMIN can view any
+- **PRD Reference:** §11.7
+- **Depends On:** M13, M14
+- **Complexity:** M
+- **Touches:** `src/app/(dashboard)/user/[userId]/page.tsx`, `src/lib/queries.ts`
+
+---
+
+#### M15-T02 — Build User Profile Page
+
+- **Type:** UI
+- **Description:** Create the profile settings page at `/user/[userId]/profile`. Allow users to edit their name, job title, and avatar. Include notification preferences toggles for each notification type.
+- **Acceptance Criteria:**
+  - Route `src/app/(dashboard)/user/[userId]/profile/page.tsx` renders profile form
+  - Name, job title, and avatar editable with Zod validation
+  - Avatar upload via Uploadthing
+  - Only the user themselves can edit their own profile
+  - Changes trigger `userTag(userId)` cache invalidation
+- **PRD Reference:** §11.7
+- **Depends On:** None (within M15)
+- **Complexity:** S
+- **Touches:** `src/app/(dashboard)/user/[userId]/profile/page.tsx`, `src/components/forms/user-profile-form.tsx`
+
+---
+
+#### M15-T03 — Build User Tasks Page
+
+- **Type:** UI
+- **Description:** Create a consolidated task view at `/user/[userId]/tasks`. Show all tasks assigned to this user across their unit, with filters for status (complete/incomplete), due date range, and project. Support "Mark Complete" and "Log Time" quick actions.
+- **Acceptance Criteria:**
+  - Route `src/app/(dashboard)/user/[userId]/tasks/page.tsx` renders assigned tasks list
+  - Filters: status (complete/incomplete), due date, project
+  - Tasks show: title, project name, due date, lane, overdue badge
+  - Quick actions: "Mark Complete", "Log Time" on each task
+  - Data fetched via `getUserTasks()` with `cacheLife("seconds")` + `userTasksTag`
+- **PRD Reference:** §11.7
+- **Depends On:** M13
+- **Complexity:** M
+- **Touches:** `src/app/(dashboard)/user/[userId]/tasks/page.tsx`
+
+---
+
+#### M15-T04 — Build User Projects Page
+
+- **Type:** UI
+- **Description:** Create the user projects page at `/user/[userId]/projects`. List all projects where the user is a TeamMember, showing project name, status, their role on the team, project progress, and next milestone.
+- **Acceptance Criteria:**
+  - Route `src/app/(dashboard)/user/[userId]/projects/page.tsx` renders project list
+  - Shows only projects where user is a TeamMember
+  - Each project card shows: name, status badge, team role, progress bar
+  - Clicking a project navigates to the project detail page
+  - Data fetched via `getUserProjects()` with `cacheLife("hours")` + `userProjectsTag`
+- **PRD Reference:** §11.7
+- **Depends On:** M08-T05
+- **Complexity:** S
+- **Touches:** `src/app/(dashboard)/user/[userId]/projects/page.tsx`
+
+---
+
+#### M15-T05 — Build User Analytics Page
+
+- **Type:** UI
+- **Description:** Create performance metrics page at `/user/[userId]/analytics`. Display: total hours logged per week and per month (bar chart), tasks completed vs. pending (donut chart), and an activity timeline of recent actions.
+- **Acceptance Criteria:**
+  - Route `src/app/(dashboard)/user/[userId]/analytics/page.tsx` renders analytics
+  - Weekly/monthly hours bar chart using recharts or similar
+  - Tasks completed vs pending donut/pie chart
+  - Activity timeline showing recent task completions and time logs
+  - Data fetched via `getUserAnalytics()` with `cacheLife("minutes")` + `userAnalyticsTag`
+- **PRD Reference:** §11.7
+- **Depends On:** M14
+- **Complexity:** M
+- **Touches:** `src/app/(dashboard)/user/[userId]/analytics/page.tsx`
 
 ---
 
@@ -675,6 +1516,92 @@
 - **Priority:** Must Have
 - **Estimated Complexity:** High
 
+### Tasks
+
+#### M16-T01 — Implement Notification Creation Utility
+
+- **Type:** Logic
+- **Description:** Create a `createNotification()` utility function in `src/lib/queries.ts` that handles fan-out logic based on `targetRole` and `targetUserId`. OWNER-targeted notifications go to exactly one user. USER notifications for PROJECT type filter by TeamMember status. Support all 10 notification types.
+- **Acceptance Criteria:**
+  - `createNotification()` accepts type, message, companyId, unitId, targetRole, targetUserId
+  - OWNER-targeted → single notification to the company owner
+  - ADMIN-targeted → fan-out to all ADMINs in the relevant unit
+  - USER PROJECT notifications → only TeamMembers of the project
+  - All 10 notification types defined in the NotificationType enum
+- **PRD Reference:** §6.12 (NOTIF-01, NOTIF-06, NOTIF-07), §9
+- **Depends On:** M08, M10, M13
+- **Complexity:** H
+- **Touches:** `src/lib/queries.ts`
+
+---
+
+#### M16-T02 — Build Bell Icon with Unread Count Badge
+
+- **Type:** UI
+- **Description:** Add a bell icon to the dashboard header that shows the unread notification count as a badge. Clicking the bell opens a dropdown showing the latest 5 unread notifications with type-specific icon, message preview, and relative timestamp.
+- **Acceptance Criteria:**
+  - Bell icon in header with dynamic unread count badge
+  - Badge hidden when count is 0
+  - Dropdown shows latest 5 unread notifications
+  - Each notification displays type icon, message, and relative time ("2 min ago")
+  - Clicking a notification marks it as read and navigates to the relevant page
+  - Unread count fetched via `getUnreadCount()` with `unstable_noStore()`
+- **PRD Reference:** §6.12 (NOTIF-02, NOTIF-03)
+- **Depends On:** M16-T01
+- **Complexity:** M
+- **Touches:** `src/components/global/notification-bell.tsx`, `src/components/global/header.tsx`
+
+---
+
+#### M16-T03 — Build Full Notifications Page
+
+- **Type:** UI
+- **Description:** Create the full notifications page at `/notifications`. Display all notifications with filter tabs (All / Unread / by Type). Include "Mark all as read" action. Each notification shows type icon, full message, timestamp, and read status.
+- **Acceptance Criteria:**
+  - Route `src/app/(dashboard)/notifications/page.tsx` renders notification list
+  - Filter tabs: All, Unread, and per notification type
+  - "Mark all as read" button marks all unread as read
+  - Individual notification click marks it as read
+  - Pagination or infinite scroll for long lists
+  - Data fetched via `getNotifications()` with `unstable_noStore()`
+- **PRD Reference:** §6.12 (NOTIF-04, NOTIF-05)
+- **Depends On:** M16-T01
+- **Complexity:** M
+- **Touches:** `src/app/(dashboard)/notifications/page.tsx`
+
+---
+
+#### M16-T04 — Wire Notification Triggers Into Existing Actions
+
+- **Type:** Logic
+- **Description:** Integrate `createNotification()` calls into all existing server actions that should trigger notifications: task assignment (TASK), team member addition (TEAM), project status change (PROJECT), phase status change (PHASE), client changes (CLIENT), production alerts (PRODUCTION), lane/tag changes (LANE/TAG), invitation acceptance (INVITATION).
+- **Acceptance Criteria:**
+  - All 10 notification types triggered from their respective server actions
+  - Correct role targeting applied per PRD notification matrix
+  - No duplicate notifications on retries (idempotent)
+  - Subscription expiry notifications (T-30, T-7, T-3, expiry, grace end) triggered
+- **PRD Reference:** §6.12, §6.3 (SUB-11), §9
+- **Depends On:** M16-T01
+- **Complexity:** H
+- **Touches:** `src/lib/queries.ts`
+
+---
+
+#### M16-T05 — Implement Mark-as-Read & Notification Queries
+
+- **Type:** Logic
+- **Description:** Create `markNotificationRead()`, `markAllRead()`, `getNotifications()`, and `getUnreadCount()` server actions/queries. Notifications use `unstable_noStore()` — never cached.
+- **Acceptance Criteria:**
+  - `markNotificationRead()` toggles individual notification read status
+  - `markAllRead()` marks all unread notifications for the user as read
+  - `getNotifications()` returns paginated, filterable notification list
+  - `getUnreadCount()` returns the unread count for the bell badge
+  - All queries use `unstable_noStore()` per caching requirements
+- **PRD Reference:** §6.12 (NOTIF-04, NOTIF-05), §14.4
+- **Depends On:** M16-T01
+- **Complexity:** M
+- **Touches:** `src/lib/queries.ts`
+
 ---
 
 ## M17 — Activity Logs
@@ -689,6 +1616,58 @@
 - **Depends On:** M10, M13
 - **Priority:** Must Have
 - **Estimated Complexity:** Medium
+
+### Tasks
+
+#### M17-T01 — Implement ActivityLog Creation Utility
+
+- **Type:** Logic
+- **Description:** Create a `logActivity()` utility in `src/lib/queries.ts` that inserts an ActivityLog record with companyId, unitId, userId, action (string), entityType (string), entityId, and metadata (JSON). This function is called from within other server actions after successful mutations.
+- **Acceptance Criteria:**
+  - `logActivity()` creates an ActivityLog entry with all required fields
+  - Metadata stores before/after snapshots or relevant context as JSON
+  - Function is non-blocking — failure to log does not fail the parent action
+  - Activity logs use `unstable_noStore()` — never cached
+- **PRD Reference:** §6.13 (ACT-01, ACT-02)
+- **Depends On:** M10, M13
+- **Complexity:** S
+- **Touches:** `src/lib/queries.ts`
+
+---
+
+#### M17-T02 — Wire Activity Logging Into Existing Actions
+
+- **Type:** Logic
+- **Description:** Add `logActivity()` calls to all server actions that modify Projects, Phases, Tasks, Clients, and Members. Log create, edit, and delete actions with the relevant metadata.
+- **Acceptance Criteria:**
+  - Project create/edit/delete → ActivityLog entry
+  - Phase create/edit/delete → ActivityLog entry
+  - Task create/edit/delete/move → ActivityLog entry
+  - Client create/edit/delete → ActivityLog entry
+  - Member add/remove → ActivityLog entry
+  - Each log captures: action type, entity details, user who performed it
+- **PRD Reference:** §6.13 (ACT-01)
+- **Depends On:** M17-T01
+- **Complexity:** M
+- **Touches:** `src/lib/queries.ts`
+
+---
+
+#### M17-T03 — Build Activity Log Page
+
+- **Type:** UI
+- **Description:** Create an activity log viewing page accessible from the dashboard. OWNER sees all logs company-wide; ADMIN sees own unit; USER sees only assigned project logs. Include filters for date range, entity type, and user.
+- **Acceptance Criteria:**
+  - Activity log page renders a chronological list of actions
+  - Filters: date range picker, entity type dropdown, user selector
+  - Each entry shows: user avatar+name, action description, entity link, timestamp
+  - RBAC-scoped: OWNER → all; ADMIN → own unit; USER → assigned projects
+  - Data fetched via `getActivityLogs()` with `unstable_noStore()`
+  - Pagination for long lists
+- **PRD Reference:** §6.13 (ACT-03 through ACT-06)
+- **Depends On:** M17-T02
+- **Complexity:** M
+- **Touches:** `src/app/(dashboard)/activity/page.tsx`, `src/components/dashboard/activity-log-list.tsx`
 
 ---
 
@@ -705,6 +1684,75 @@
 - **Depends On:** M10, M13, M16, M17
 - **Priority:** Must Have
 - **Estimated Complexity:** Medium
+
+### Tasks
+
+#### M18-T01 — Populate cache.ts with All Tags & Profiles
+
+- **Type:** Config
+- **Description:** Finalize `src/lib/cache.ts` with all cache tag factory functions and cacheLife profiles as defined in PRD §14.2 and §14.3. Ensure every tag used across queries.ts is defined as a typed constant — no inline string literals.
+- **Acceptance Criteria:**
+  - All tag factories from PRD §14.3 are exported (plans, company, subscription, unit, project, phase, user scopes)
+  - Custom `"seconds"` cacheLife profile registered for Kanban data
+  - All exported constants are type-safe with autocomplete support
+  - No inline cache tag strings exist anywhere in `queries.ts`
+- **PRD Reference:** §14.2, §14.3 (CACHE-01, CACHE-02, CACHE-07)
+- **Depends On:** None (within M18)
+- **Complexity:** S
+- **Touches:** `src/lib/cache.ts`
+
+---
+
+#### M18-T02 — Apply 'use cache' Directives to All Queries
+
+- **Type:** Logic
+- **Description:** Audit all data-fetching functions in `src/lib/queries.ts` and apply the `'use cache'` directive with appropriate `cacheTag()` and `cacheLife()` calls per the caching decision map (PRD §14.4). Ensure never-cached functions use `unstable_noStore()`.
+- **Acceptance Criteria:**
+  - All cacheable queries use `'use cache'` with correct tag + life profile
+  - `getPlans()` → `cacheLife("static")`
+  - `getCompanyById()` → `cacheLife("days")` + `companyTag(id)`
+  - `getUnitTasks()` → `cacheLife("seconds")` + `unitTasksTag(id)`
+  - `getNotifications()`, `getActivityLogs()`, `getUnreadCount()` → `unstable_noStore()`
+  - `'use cache'` only in server functions — never in Client Components
+- **PRD Reference:** §14.4, §14.6 (CACHE-01, CACHE-04 through CACHE-08)
+- **Depends On:** M18-T01
+- **Complexity:** M
+- **Touches:** `src/lib/queries.ts`
+
+---
+
+#### M18-T03 — Audit & Complete Cache Invalidation in Mutations
+
+- **Type:** Logic
+- **Description:** Audit all server action mutations in `src/lib/queries.ts` and ensure each calls `revalidateTag()` for the exact minimum set of affected tags per the invalidation map in PRD §14.5. Fix any missing or over-broad invalidations.
+- **Acceptance Criteria:**
+  - Every mutation calls `revalidateTag()` per the §14.5 mapping
+  - Phase progress update also invalidates `projectTag(projectId)` (CACHE-09)
+  - Subscription activation invalidates `subscriptionTag(companyId)` (CACHE-10)
+  - No broad/global invalidations — always scoped to entity ID
+  - Verified: mutation → tag pairing matches the PRD table exactly
+- **PRD Reference:** §14.5, §14.6 (CACHE-03, CACHE-09, CACHE-10)
+- **Depends On:** M18-T02
+- **Complexity:** M
+- **Touches:** `src/lib/queries.ts`
+
+---
+
+#### M18-T04 — Performance Testing & Optimization
+
+- **Type:** Testing
+- **Description:** Run performance benchmarks against the PRD targets. Measure LCP, Server Action response times, Gantt rendering with 50+ phases, and Kanban rendering with 200+ tasks. Identify and fix any bottlenecks (N+1 queries, excessive re-renders, large bundles).
+- **Acceptance Criteria:**
+  - LCP < 2.5s on standard broadband (NFR-01)
+  - Server Actions respond in < 500ms under normal load (NFR-02)
+  - Gantt chart renders 50 phases without visible lag (NFR-03)
+  - Kanban board renders 200 tasks across 10 lanes without degradation (NFR-04)
+  - Any identified bottlenecks documented and resolved
+  - Lighthouse performance score ≥ 90 on key pages
+- **PRD Reference:** §7 (NFR-01 through NFR-04)
+- **Depends On:** M18-T03
+- **Complexity:** H
+- **Touches:** Multiple files (optimization targets identified during testing)
 
 ---
 

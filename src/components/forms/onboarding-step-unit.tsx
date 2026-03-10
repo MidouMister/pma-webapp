@@ -34,15 +34,16 @@ type UnitFormValues = z.infer<typeof unitSchema>;
 export function OnboardingStepUnit() {
   const setStep = useSetAtom(onboardingStepAtom);
   const setUnitData = useSetAtom(onboardingUnitAtom);
+  const unitData = useAtomValue(onboardingUnitAtom);
   const companyData = useAtomValue(onboardingCompanyAtom);
 
   const form = useForm<UnitFormValues>({
     resolver: zodResolver(unitSchema),
     defaultValues: {
-      name: "",
-      address: "",
-      phone: "",
-      email: "",
+      name: unitData?.name || "",
+      address: unitData?.address || "",
+      phone: unitData?.phone || "",
+      email: unitData?.email || "",
     },
   });
 

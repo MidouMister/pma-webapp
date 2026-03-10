@@ -226,6 +226,7 @@ _Referential integrity is guaranteed by `restrict` and `set null` when retaining
 | ---------------- | --------------------------------------------- | ---------------------------------- | -------------- |
 | Monetary amounts | `1 234 567,89 DA` (Algerian Dinar, FR locale) | `formatAmount()` in `lib/utils.ts` | ✅ Implemented |
 | Dates            | `DD MMM YYYY` (e.g. `15 Jan 2026`)            | `formatDate()` in `lib/utils.ts`   | ✅ Implemented |
+| Auth Shell       | `ClerkProvider` in `Suspense` inside `body`   | Required for Next.js 16 PPR        | ✅ Implemented |
 
 ---
 

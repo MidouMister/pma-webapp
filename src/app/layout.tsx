@@ -19,6 +19,7 @@ export const metadata: Metadata = {
 };
 
 import { Providers } from "@/providers/jotai-provider";
+import { Suspense } from "react";
 
 export default function RootLayout({
   children,
@@ -26,14 +27,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider>
-      <html lang="en" suppressHydrationWarning>
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased selection:bg-primary/20`}
-        >
-          <Providers>{children}</Providers>
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased selection:bg-primary/20`}
+      >
+        <Suspense fallback={null}>
+          <ClerkProvider dynamic>
+            <Providers>{children}</Providers>
+          </ClerkProvider>
+        </Suspense>
+      </body>
+    </html>
   );
 }

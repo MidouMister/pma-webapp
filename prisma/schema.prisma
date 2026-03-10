@@ -6,6 +6,328 @@ datasource db {
   provider = "postgresql"
 }
 
+model Plan {
+  id                 String         @id @default(uuid())
+  name               String         @unique
+  monthlyCost        Float
+  maxUnits           Int?
+  maxProjects        Int?
+  maxTasksPerProject Int?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  maxMembers         Int?
+  subscriptions      Subscription[]
+}
+
+model Company {
+  id            String         @id @default(uuid())
+  name          String
+  companyEmail  String?
+  ownerId       String         @unique
+  logo          String?
+  nif           String?
+  formJur       String?
+  secteur       String?
+  state         String?
+  address       String?
+  phone         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  invitations   Invitation[]
+  notifications Notification[]
+  subscriptions Subscription[]
+  units         Unit[]
+  users         User[]
+}
+
+model Subscription {
+  id        String   @id @default(uuid())
+  startAt   DateTime
+  endAt     DateTime
+  price     Float?
+  active    Boolean  @default(false)
+  companyId String
+  planId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan      Plan     @relation(fields: [planId], references: [id])
+}
+
+model User {
+  id               String         @id
+  name             String
+  email            String         @unique
+  role             Role           @default(USER)
+  jobTitle         String?
+  avatarUrl        String?
+  companyId        String?
+  unitId           String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  adminID          String?        @unique
+  notifications    Notification[] @relation("NotifiedUser")
+  tasks            Task[]
+  teamMembers      TeamMember[]
+  timeEntries      TimeEntry[]
+  administeredUnit Unit?          @relation("UnitAdmin")
+  company          Company?       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  unit             Unit?          @relation("UnitUsers", fields: [unitId], references: [id])
+}
+
+model Unit {
+  id            String         @id @default(uuid())
+  name          String
+  address       String?
+  phone         String?
+  email         String?
+  companyId     String
+  adminId       String         @unique
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  clients       Client[]
+  invitations   Invitation[]
+  lanes         Lane[]
+  notifications Notification[]
+  projects      Project[]
+  tags          Tag[]
+  tasks         Task[]
+  admin         User           @relation("UnitAdmin", fields: [adminId], references: [id])
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  users         User[]         @relation("UnitUsers")
+}
+
+model Invitation {
+  id                String           @id @default(uuid())
+  email             String
+  status            InvitationStatus @default(PENDING)
+  role              Role             @default(USER)
+  clerkInvitationId String?
+  companyId         String
+  unitId            String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  company           Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  unit              Unit?            @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([email, companyId])
+}
+
+model Client {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  wilaya    String?
+  phone     String?
+  email     String?   @unique
+  unitId    String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  unit      Unit      @relation(fields: [unitId], references: [id])
+  projects  Project[]
+}
+
+model Project {
+  id           String        @id @default(uuid())
+  name         String
+  code         String
+  type         String?
+  montantHT    Float?
+  montantTTC   Float?
+  ods          DateTime?
+  delai        String?
+  status       ProjectStatus @default(NEW)
+  signe        Boolean       @default(false)
+  unitId       String
+  clientId     String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  ganttMarkers GanttMarker[]
+  phases       Phase[]
+  client       Client?       @relation(fields: [clientId], references: [id])
+  unit         Unit          @relation(fields: [unitId], references: [id])
+  team         Team?
+  timeEntries  TimeEntry[]
+
+  @@unique([code, unitId])
+}
+
+model Team {
+  id        String       @id @default(uuid())
+  projectId String       @unique
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  project   Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  members   TeamMember[]
+}
+
+model TeamMember {
+  id        String   @id @default(uuid())
+  role      String
+  teamId    String
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([teamId, userId])
+}
+
+model Phase {
+  id        String        @id @default(uuid())
+  name      String
+  code      String?
+  montantHT Float?
+  start     DateTime
+  end       DateTime
+  progress  Float         @default(0)
+  duration  Int
+  projectId String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  obs       String?
+  status    ProjectStatus @default(NEW)
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  product   Product?
+  subPhases SubPhase[]
+}
+
+model SubPhase {
+  id        String         @id @default(uuid())
+  name      String
+  code      String?
+  progress  Float          @default(0)
+  start     DateTime
+  end       DateTime
+  phaseId   String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  status    SubPhaseStatus @default(TODO)
+  phase     Phase          @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+}
+
+model GanttMarker {
+  id        String   @id @default(uuid())
+  label     String
+  date      DateTime
+  className String?
+  projectId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Product {
+  id          String       @id @default(uuid())
+  date        DateTime
+  taux        Float
+  montantProd Float
+  phaseId     String       @unique
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  phase       Phase        @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  productions Production[]
+}
+
+model Production {
+  id        String   @id @default(uuid())
+  date      DateTime
+  taux      Float
+  mntProd   Float
+  productId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Task {
+  id             String      @id @default(uuid())
+  title          String
+  description    String?
+  dueDate        DateTime?
+  complete       Boolean     @default(false)
+  order          Int         @default(0)
+  assignedUserId String?
+  laneId         String?
+  unitId         String
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  assignedUser   User?       @relation(fields: [assignedUserId], references: [id])
+  lane           Lane?       @relation(fields: [laneId], references: [id])
+  unit           Unit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  timeEntries    TimeEntry[]
+  tags           Tag[]       @relation("TaskTags")
+}
+
+model Lane {
+  id        String   @id @default(uuid())
+  name      String
+  color     String?
+  order     Int      @default(0)
+  unitId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  unit      Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+}
+
+model Tag {
+  id        String   @id @default(uuid())
+  name      String
+  color     String?
+  unitId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  unit      Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  tasks     Task[]   @relation("TaskTags")
+}
+
+model TimeEntry {
+  id          String    @id @default(uuid())
+  description String?
+  startTime   DateTime
+  endTime     DateTime?
+  duration    Int?
+  userId      String
+  taskId      String?
+  projectId   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task        Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id           String           @id @default(uuid())
+  notification String
+  type         NotificationType
+  read         Boolean          @default(false)
+  companyId    String
+  unitId       String?
+  userId       String?
+  targetRole   Role?
+  targetUserId String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  company      Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  unit         Unit?            @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  user         User?            @relation("NotifiedUser", fields: [userId], references: [id])
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  companyId  String
+  unitId     String?
+  userId     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
 enum Role {
   OWNER
   ADMIN
@@ -48,366 +370,4 @@ enum TaskDependencyType {
   SS
   FF
   SF
-}
-
-model Plan {
-  id                 String         @id @default(uuid())
-  name               String         @unique
-  monthlyCost        Float
-  maxUnits           Int?
-  maxProjects        Int?
-  maxTasksPerProject Int?
-  maxMembers         Int?
-  subscriptions      Subscription[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Company {
-  id           String  @id @default(uuid())
-  name         String
-  companyEmail String?
-  ownerId      String  @unique
-  logo         String?
-  nif          String?
-  formJur      String?
-  secteur      String?
-
-  users         User[]
-  units         Unit[]
-  subscriptions Subscription[]
-  invitations   Invitation[]
-  notifications Notification[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Subscription {
-  id        String   @id @default(uuid())
-  startAt   DateTime
-  endAt     DateTime
-  price     Float?
-  active    Boolean  @default(false)
-  companyId String
-  planId    String
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  plan    Plan    @relation(fields: [planId], references: [id], onDelete: Restrict)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model User {
-  id        String  @id
-  name      String
-  email     String  @unique
-  role      Role    @default(USER)
-  jobTitle  String?
-  avatarUrl String?
-  adminID   String? @unique
-  unitId    String?
-  companyId String? // the user might not be in a company if they are just created
-
-  company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  unit    Unit?    @relation("UnitUsers", fields: [unitId], references: [id], onDelete: SetNull)
-
-  // Reverse relation for when user is the admin of a unit
-  administeredUnit Unit? @relation("UnitAdmin")
-
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  teamMembers   TeamMember[]
-  tasks         Task[]
-  timeEntries   TimeEntry[]
-  notifications Notification[] @relation("NotifiedUser")
-}
-
-model Unit {
-  id        String  @id @default(uuid())
-  name      String
-  address   String?
-  phone     String?
-  email     String?
-  companyId String
-  adminId   String  @unique
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  admin   User    @relation("UnitAdmin", fields: [adminId], references: [id], onDelete: Restrict)
-
-  users         User[]         @relation("UnitUsers")
-  invitations   Invitation[]
-  projects      Project[]
-  tasks         Task[]
-  lanes         Lane[]
-  tags          Tag[]
-  notifications Notification[]
-  clients       Client[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Invitation {
-  id                String           @id @default(uuid())
-  email             String
-  companyId         String
-  unitId            String?
-  role              Role             @default(USER)
-  status            InvitationStatus @default(PENDING)
-  clerkInvitationId String?
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  unit    Unit?   @relation(fields: [unitId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([email, companyId])
-}
-
-model Client {
-  id     String  @id @default(uuid())
-  name   String  @unique
-  wilaya String?
-  phone  String?
-  email  String? @unique
-  unitId String
-
-  unit     Unit      @relation(fields: [unitId], references: [id], onDelete: Restrict)
-  projects Project[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Project {
-  id         String        @id @default(uuid())
-  name       String
-  code       String
-  type       String?
-  montantHT  Float?
-  montantTTC Float?
-  ods        DateTime?
-  delai      String?
-  status     ProjectStatus @default(NEW)
-  signe      Boolean       @default(false)
-  clientId   String?
-  unitId     String
-
-  unit         Unit          @relation(fields: [unitId], references: [id], onDelete: Restrict)
-  client       Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  team         Team?
-  phases       Phase[]
-  ganttMarkers GanttMarker[]
-  timeEntries  TimeEntry[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([code, unitId])
-}
-
-model Team {
-  id        String @id @default(uuid())
-  projectId String @unique
-
-  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  members TeamMember[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model TeamMember {
-  id     String @id @default(uuid())
-  role   String
-  teamId String
-  userId String
-
-  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([teamId, userId])
-}
-
-model Phase {
-  id        String        @id @default(uuid())
-  name      String
-  code      String?
-  montantHT Float?
-  start     DateTime
-  end       DateTime
-  status    ProjectStatus @default(NEW)
-  obs       String?
-  progress  Float         @default(0)
-  duration  Int
-  projectId String
-
-  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  subPhases SubPhase[]
-  product   Product?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model SubPhase {
-  id       String         @id @default(uuid())
-  name     String
-  code     String?
-  status   SubPhaseStatus @default(TODO)
-  progress Float          @default(0)
-  start    DateTime
-  end      DateTime
-  phaseId  String
-
-  phase Phase @relation(fields: [phaseId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model GanttMarker {
-  id        String   @id @default(uuid())
-  label     String
-  date      DateTime
-  className String?
-  projectId String
-
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Product {
-  id          String   @id @default(uuid())
-  date        DateTime
-  taux        Float
-  montantProd Float
-  phaseId     String   @unique
-
-  phase       Phase        @relation(fields: [phaseId], references: [id], onDelete: Cascade)
-  productions Production[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Production {
-  id        String   @id @default(uuid())
-  date      DateTime
-  taux      Float
-  mntProd   Float
-  productId String
-
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Task {
-  id             String    @id @default(uuid())
-  title          String
-  description    String?
-  dueDate        DateTime?
-  complete       Boolean   @default(false)
-  assignedUserId String?
-  laneId         String?
-  order          Int       @default(0)
-  unitId         String
-  tags           Tag[]     @relation("TaskTags")
-
-  unit         Unit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  assignedUser User?       @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
-  lane         Lane?       @relation(fields: [laneId], references: [id], onDelete: SetNull)
-  timeEntries  TimeEntry[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Lane {
-  id     String  @id @default(uuid())
-  name   String
-  color  String?
-  order  Int     @default(0)
-  unitId String
-
-  unit  Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  tasks Task[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Tag {
-  id     String  @id @default(uuid())
-  name   String
-  color  String?
-  unitId String
-
-  unit  Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  tasks Task[] @relation("TaskTags")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model TimeEntry {
-  id          String    @id @default(uuid())
-  description String?
-  startTime   DateTime
-  endTime     DateTime?
-  duration    Int? // duration in minutes
-  userId      String
-  taskId      String?
-  projectId   String?
-
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  task    Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Notification {
-  id           String           @id @default(uuid())
-  notification String           @db.Text
-  companyId    String
-  unitId       String?
-  userId       String?
-  targetRole   Role?
-  targetUserId String?
-  read         Boolean          @default(false)
-  type         NotificationType
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  unit    Unit?   @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  user    User?   @relation("NotifiedUser", fields: [userId], references: [id], onDelete: SetNull)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model ActivityLog {
-  id         String  @id @default(uuid())
-  companyId  String
-  unitId     String?
-  userId     String?
-  action     String
-  entityType String
-  entityId   String
-  metadata   Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }

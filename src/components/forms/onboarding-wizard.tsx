@@ -1,14 +1,14 @@
 "use client";
 
-import { atom } from "jotai";
 import { useAtomValue } from "jotai";
+import { atomWithStorage } from "jotai/utils";
 import { OnboardingStepCompany } from "./onboarding-step-company";
 import { OnboardingStepUnit } from "./onboarding-step-unit";
 import { OnboardingStepInvite } from "./onboarding-step-invite";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check } from "lucide-react";
 
-export const onboardingStepAtom = atom<1 | 2 | 3>(1);
+export const onboardingStepAtom = atomWithStorage<1 | 2 | 3>("onboarding_step", 1);
 
 export interface CompanyData {
   name: string;
@@ -33,9 +33,9 @@ export interface InviteData {
   invites: Array<{ email: string; role: "ADMIN" | "USER" }>;
 }
 
-export const onboardingCompanyAtom = atom<CompanyData | null>(null);
-export const onboardingUnitAtom = atom<UnitData | null>(null);
-export const onboardingInviteAtom = atom<InviteData | null>(null);
+export const onboardingCompanyAtom = atomWithStorage<CompanyData | null>("onboarding_company", null);
+export const onboardingUnitAtom = atomWithStorage<UnitData | null>("onboarding_unit", null);
+export const onboardingInviteAtom = atomWithStorage<InviteData | null>("onboarding_invite", null);
 
 const steps = [
   { id: 1, name: "Company Profile" },
@@ -50,12 +50,12 @@ export function OnboardingWizard() {
     <div className="w-full max-w-3xl mx-auto space-y-8">
       {/* Stepper */}
       <nav aria-label="Progress">
-        <ol role="list" className="flex items-center">
+        <ol role="list" className="flex items-center w-full justify-between lg:justify-center lg:gap-8">
           {steps.map((step, stepIdx) => (
             <li
               key={step.name}
-              className={`relative ${
-                stepIdx !== steps.length - 1 ? "pr-8 sm:pr-20" : ""
+              className={`relative flex items-center ${
+                stepIdx !== steps.length - 1 ? "flex-1 w-full" : ""
               }`}
             >
               <div className="absolute inset-0 flex items-center" aria-hidden="true">
