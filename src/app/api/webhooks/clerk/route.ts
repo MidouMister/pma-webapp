@@ -2,6 +2,34 @@ import { Webhook } from 'svix'
 import { headers } from 'next/headers'
 import { WebhookEvent } from '@clerk/nextjs/server'
 import { db } from '@/lib/db'
+import { InvitationStatus } from '@prisma/client'
+
+async function createInvitationAcceptedNotification(
+  companyId: string,
+  invitedUserEmail: string,
+  invitedUserName: string
+) {
+  try {
+    const company = await db.company.findUnique({
+      where: { id: companyId },
+      select: { ownerId: true, name: true },
+    })
+
+    if (company) {
+      await db.notification.create({
+        data: {
+          notification: `${invitedUserName} (${invitedUserEmail}) has accepted your invitation and joined ${company.name}.`,
+          type: 'INVITATION',
+          companyId,
+          userId: company.ownerId,
+          read: false,
+        },
+      })
+    }
+  } catch (e) {
+    console.error('[Webhook] Failed to create invitation accepted notification:', e)
+  }
+}
 
 export async function POST(req: Request) {
   // You can find this in the Clerk Dashboard -> Webhooks -> choose the endpoint
@@ -56,23 +84,81 @@ export async function POST(req: Request) {
     const primaryEmail = email_addresses?.length > 0 ? email_addresses[0].email_address : ''
     const fullName = `${first_name || ''} ${last_name || ''}`.trim() || 'Unknown User'
     
+    // Normalize email for case-insensitive lookup
+    const normalizedEmail = primaryEmail.toLowerCase()
+
     try {
-      await db.user.upsert({
-        where: { id },
-        create: {
-          id,
-          email: primaryEmail,
-          name: fullName,
-          avatarUrl: image_url || null,
-          role: 'USER', // Default role until onboarding is complete or invite is accepted
-        },
-        update: {
-          email: primaryEmail,
-          name: fullName,
-          avatarUrl: image_url || null,
-        }
-      })
-      console.log(`[Webhook] User ${id} synchronized.`)
+      // Check if this user was invited (only for user.created)
+      let invitation = null
+      if (eventType === 'user.created') {
+        invitation = await db.invitation.findFirst({
+          where: {
+            email: normalizedEmail,
+            status: InvitationStatus.PENDING,
+          },
+          include: {
+            company: { select: { ownerId: true, name: true } },
+            unit: { select: { id: true, name: true } },
+          },
+        })
+      }
+
+      if (invitation) {
+        // Update invitation status to ACCEPTED
+        await db.invitation.update({
+          where: { id: invitation.id },
+          data: { status: InvitationStatus.ACCEPTED },
+        })
+
+        // Create user with companyId, unitId, and role from invitation
+        await db.user.upsert({
+          where: { id },
+          create: {
+            id,
+            email: primaryEmail,
+            name: fullName,
+            avatarUrl: image_url || null,
+            companyId: invitation.companyId,
+            unitId: invitation.unitId,
+            role: invitation.role,
+          },
+          update: {
+            email: primaryEmail,
+            name: fullName,
+            avatarUrl: image_url || null,
+            companyId: invitation.companyId,
+            unitId: invitation.unitId,
+            role: invitation.role,
+          },
+        })
+
+        // Create notification for the company owner
+        await createInvitationAcceptedNotification(
+          invitation.companyId,
+          primaryEmail,
+          fullName
+        )
+
+        console.log(`[Webhook] User ${id} created via invitation to unit ${invitation.unitId}`)
+      } else {
+        // Default behavior: create as USER without company/unit
+        await db.user.upsert({
+          where: { id },
+          create: {
+            id,
+            email: primaryEmail,
+            name: fullName,
+            avatarUrl: image_url || null,
+            role: 'USER',
+          },
+          update: {
+            email: primaryEmail,
+            name: fullName,
+            avatarUrl: image_url || null,
+          },
+        })
+        console.log(`[Webhook] User ${id} synchronized.`)
+      }
     } catch (e) {
       console.error(`[Webhook] Failed to synchronize user ${id}:`, e)
       return new Response('Database Error', { status: 500 })

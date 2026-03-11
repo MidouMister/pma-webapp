@@ -718,106 +718,39 @@
 
 ---
 
-## M08 — Team & Invitations
+## ✅ M08 — Team & Invitations
 
 - **Goal:** Implement the invitation system and team management so that OWNER/ADMIN can build their workforce and assign members to project teams.
 - **Covers PRD Sections:** §6.5 (Team & Invitations)
-- **Key Deliverables:**
-  - OWNER or ADMIN can invite users by email with role `ADMIN` or `USER` (never `OWNER`)
-  - Clerk sends invitation email; `clerkInvitationId` stored for tracking
-  - Invitation status transitions: PENDING → ACCEPTED or PENDING → REJECTED
-  - `/company/[companyId]/team` page: company-wide member directory with roles, invite history, pending invitations
-  - `/unite/[unitId]/users` page: unit member list with role badges, job titles, invite/remove controls
-  - Project Team management: add/remove unit members to a Project's Team with project-specific role label
-- **Depends On:** M07
-- **Priority:** Must Have
-- **Estimated Complexity:** High
+- **Status:** ✅ Complete (2026-03-11)
 
-### Tasks
+- [x] **M08-T01: Implement Invitation Server Actions** ✅ 2026-03-11
+  - Created `sendInvitation()`, `cancelInvitation()`, `resendInvitation()` in queries.ts
+  - Creates Clerk invitation + DB record, enforces plan limits, blocks OWNER role
+  - Added helper functions: `getCompanyMembers`, `getCompanyInvitations`, `getUnitInvitations`, `checkPlanLimitForMembers`
 
-#### M08-T01 — Implement Invitation Server Actions
+- [x] **M08-T02: Build Company-Wide Team Page** ✅ 2026-03-11
+  - Created `/company/[companyId]/team/page.tsx` with members table
+  - Shows avatar, name, email, role badge, unit, job title, joined date
+  - Pending invitations section with cancel/resend actions
+  - "Invite Member" button opens dialog form
 
-- **Type:** Logic
-- **Description:** Create `sendInvitation()`, `cancelInvitation()`, and `resendInvitation()` server actions in `src/lib/queries.ts`. `sendInvitation()` must call `clerkClient.invitations.create()` with the email and role, store the `clerkInvitationId` in the Invitation model, and enforce that OWNER role cannot be invited. Enforce one active invitation per email per company.
-- **Acceptance Criteria:**
-  - `sendInvitation()` creates a Clerk invitation and a PMA `Invitation` record with status `PENDING`
-  - Inviting as `OWNER` role is explicitly blocked with an error
-  - Duplicate active invitation per email per company is rejected
-  - `cancelInvitation()` revokes the Clerk invitation and sets status to `REJECTED`
-  - `resendInvitation()` re-sends a PENDING invitation via Clerk
-  - Plan limit check for `maxMembers` before sending
-- **PRD Reference:** §6.5 (INV-01 through INV-07)
-- **Depends On:** M07
-- **Complexity:** H
-- **Touches:** `src/lib/queries.ts`
+- [x] **M08-T03: Build Unit Members Page** ✅ 2026-03-11
+  - Created `/unite/[unitId]/users/page.tsx` with member list
+  - ADMIN can invite/remove members from their unit
+  - Added `removeUserFromUnit()` server action
 
----
+- [x] **M08-T04: Implement Invitation Acceptance & User Assignment** ✅ 2026-03-11
+  - Updated webhook (`user.created`) to detect invitations and assign user to unit
+  - Updates Invitation status to ACCEPTED on signup
+  - Creates INVITATION notification for company owner
+  - Updated middleware to bypass onboarding for invited users
 
-#### M08-T02 — Build Company-Wide Team Page
-
-- **Type:** UI
-- **Description:** Create the company team management page at `/company/[companyId]/team`. Display all members across all units with avatar, name, email, role badge, unit assignment, job title, and joined date. Include a section for pending invitations with cancel/resend actions. Add an "Invite Member" button that opens the invitation form.
-- **Acceptance Criteria:**
-  - Route `src/app/(dashboard)/company/[companyId]/team/page.tsx` renders company-wide member list
-  - Members table/list shows: avatar, name, email, role badge, unit, job title, joined date
-  - Pending invitations section with status, cancel, and resend actions
-  - "Invite Member" opens a dialog with unit picker, email input, and role selector
-  - OWNER-only access enforced
-- **PRD Reference:** §6.5 (INV-12), §11.5
-- **Depends On:** M08-T01
-- **Complexity:** M
-- **Touches:** `src/app/(dashboard)/company/[companyId]/team/page.tsx`, `src/components/forms/invite-form.tsx`
-
----
-
-#### M08-T03 — Build Unit Members Page
-
-- **Type:** UI
-- **Description:** Create the unit member directory at `/unite/[unitId]/users`. Show all members assigned to the unit with avatar, name, email, role badge, job title, and joined date. ADMIN can invite new members to their unit and remove existing members. Include pending invitations section.
-- **Acceptance Criteria:**
-  - Route `src/app/(dashboard)/unite/[unitId]/users/page.tsx` renders the unit member list
-  - ADMIN can invite new members scoped to this unit
-  - ADMIN/OWNER can remove a member from the unit (does not delete the User account)
-  - Removed members lose access to all unit-scoped data
-  - Pending invitations for this unit displayed with cancel/resend actions
-- **PRD Reference:** §6.5 (INV-10, INV-11, INV-12), §11.6
-- **Depends On:** M08-T01
-- **Complexity:** M
-- **Touches:** `src/app/(dashboard)/unite/[unitId]/users/page.tsx`
-
----
-
-#### M08-T04 — Implement Invitation Acceptance & User Assignment
-
-- **Type:** Logic
-- **Description:** Handle the post-signup flow for invited users. When a user signs up via a Clerk invitation link (`__clerk_ticket`), the middleware and webhook must detect the invitation, update the `Invitation` status to `ACCEPTED`, assign the user to the correct Unit with the invited role, and skip onboarding. Create an `INVITATION` notification for the OWNER.
-- **Acceptance Criteria:**
-  - Invited users bypass `/onboarding` and are assigned directly to their unit
-  - `Invitation.status` transitions to `ACCEPTED` on signup
-  - User is assigned `companyId`, `unitId`, and the invited `role`
-  - OWNER receives an `INVITATION` notification when an invite is accepted
-  - Rejected invitations create a notification as well
-- **PRD Reference:** §6.5 (INV-04, INV-08, INV-09), AUTH-05
-- **Depends On:** M08-T01, M03-T02
-- **Complexity:** H
-- **Touches:** `src/lib/queries.ts`, `src/app/api/webhooks/clerk/route.ts`, `src/middleware.ts`
-
----
-
-#### M08-T05 — Implement Project Team Management
-
-- **Type:** UI/Logic
-- **Description:** Create `addTeamMember()` and `removeTeamMember()` server actions and a Team management UI panel inside the project detail page. ADMIN/OWNER can add unit members to a project's Team with a project-specific role label. Removing a member revokes their project access.
-- **Acceptance Criteria:**
-  - `addTeamMember()` adds a user to the project's Team with a role label
-  - `removeTeamMember()` removes the user from the project Team
-  - Adding a member sends a `TEAM` notification to the added user
-  - USER can only view projects they are a TeamMember of
-  - Cache invalidation: `projectTeamTag`, `userProjectsTag`, `companyTeamTag`
-- **PRD Reference:** §6.5 (TEAM-01 through TEAM-05), §14.5
-- **Depends On:** M08-T01
-- **Complexity:** M
-- **Touches:** `src/lib/queries.ts`, `src/components/dashboard/project-team-panel.tsx`
+- [x] **M08-T05: Implement Project Team Management** ✅ 2026-03-11
+  - Added `addTeamMember()` and `removeTeamMember()` server actions
+  - Created project-team-panel.tsx component
+  - Sends TEAM notification when user is added
+  - Cache invalidation for projectTeamTag, userProjectsTag
 
 ---
 

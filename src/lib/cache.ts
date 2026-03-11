@@ -13,6 +13,12 @@ export const TAGS = {
   CLIENT: (id: string) => `client:${id}`,
   NOTIFICATIONS: (userId: string) => `notifications:${userId}`,
   ACTIVITY: (id: string) => `activity:${id}`,
+  INVITATION: (id: string) => `invitation:${id}`,
+  COMPANY_INVITATIONS: (companyId: string) => `company-invitations:${companyId}`,
+  UNIT_INVITATIONS: (unitId: string) => `unit-invitations:${unitId}`,
+  UNIT_MEMBERS: (unitId: string) => `unit-members:${unitId}`,
+  PROJECT_TEAM: (projectId: string) => `project-team:${projectId}`,
+  USER_PROJECTS: (userId: string) => `user-projects:${userId}`,
 } as const;
 
 // Cache Life Profiles

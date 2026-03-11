@@ -219,7 +219,9 @@ _Referential integrity is guaranteed by `restrict` and `set null` when retaining
 - `src/app/(dashboard)/company/[companyId]/settings/page.tsx` - Company Settings
 - `src/app/(dashboard)/company/[companyId]/settings/billing/page.tsx` - Billing & Plans
 - `src/app/(dashboard)/company/[companyId]/units/page.tsx` - Units Management
+- `src/app/(dashboard)/company/[companyId]/team/page.tsx` - Company Team & Invitations
 - `src/app/(dashboard)/unite/[unitId]/page.tsx` - Unit Dashboard
+- `src/app/(dashboard)/unite/[unitId]/users/page.tsx` - Unit Members Management
 
 ---
 
