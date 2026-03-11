@@ -609,3 +609,425 @@ export async function requestUpgrade(values: z.infer<typeof upgradeRequestSchema
     return { success: false, error: message };
   }
 }
+
+// ============================================================================
+// M07 - Unit Management Server Actions
+// ============================================================================
+
+/**
+ * Unit creation input schema
+ */
+const createUnitSchema = z.object({
+  name: z.string().min(1, "Unit name is required"),
+  address: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().email("Invalid email").optional().or(z.literal("")),
+  adminId: z.string().min(1, "Admin assignment is required"),
+});
+
+/**
+ * Unit update input schema
+ */
+const updateUnitSchema = z.object({
+  name: z.string().min(1, "Unit name is required").optional(),
+  address: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().email("Invalid email").optional().or(z.literal("")),
+});
+
+/**
+ * Creates a new Unit for a company.
+ * Only OWNER can create units.
+ * Enforces Plan.maxUnits limit.
+ */
+export async function createUnit(companyId: string, values: z.infer<typeof createUnitSchema>) {
+  const { userId } = await auth();
+  if (!userId) return { success: false, error: "Unauthorized" };
+
+  try {
+    // Verify ownership
+    const company = await db.company.findUnique({
+      where: { id: companyId },
+      select: { ownerId: true },
+    });
+
+    if (!company || company.ownerId !== userId) {
+      return { success: false, error: "Only the company owner can create units." };
+    }
+
+    // Check plan limits
+    await checkPlanLimit(companyId, "units");
+
+    // Validate input
+    const validated = createUnitSchema.parse(values);
+
+    // Verify admin exists and is in this company
+    const adminUser = await db.user.findFirst({
+      where: { id: validated.adminId, companyId },
+      include: { administeredUnit: true },
+    });
+
+    if (!adminUser) {
+      return { success: false, error: "Selected admin must be a member of this company." };
+    }
+
+    // Check if user is already admin of another unit
+    if (adminUser.administeredUnit) {
+      return { success: false, error: "This user is already an admin of another unit." };
+    }
+
+    // Create the unit
+    const newUnit = await db.unit.create({
+      data: {
+        name: validated.name,
+        address: validated.address,
+        phone: validated.phone,
+        email: validated.email,
+        companyId,
+        adminId: validated.adminId,
+      },
+      include: {
+        admin: { select: { id: true, name: true, email: true } },
+        company: { select: { name: true } },
+      },
+    });
+
+    // Update the admin user's role and unit assignment
+    await db.user.update({
+      where: { id: validated.adminId },
+      data: {
+        role: "ADMIN",
+        unitId: newUnit.id,
+      },
+    });
+
+    // Invalidate cache
+    updateTag(TAGS.COMPANY(companyId));
+
+    return { success: true, unit: newUnit };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Something went wrong";
+    console.error("[Queries] Create Unit Error:", message);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Updates an existing Unit.
+ * OWNER can update any unit.
+ * ADMIN can only update their own unit.
+ */
+export async function updateUnit(unitId: string, values: z.infer<typeof updateUnitSchema>) {
+  const { userId } = await auth();
+  if (!userId) return { success: false, error: "Unauthorized" };
+
+  try {
+    // Get the unit
+    const unit = await db.unit.findUnique({
+      where: { id: unitId },
+      select: { companyId: true, adminId: true, company: { select: { ownerId: true } } },
+    });
+
+    if (!unit) {
+      return { success: false, error: "Unit not found." };
+    }
+
+    // Check permissions: OWNER can update any unit, ADMIN can only update their own
+    const isOwner = unit.company.ownerId === userId;
+    const isAdmin = unit.adminId === userId;
+
+    if (!isOwner && !isAdmin) {
+      return { success: false, error: "You don't have permission to update this unit." };
+    }
+
+    // Validate input
+    const validated = updateUnitSchema.parse(values);
+
+    // Update the unit
+    const updatedUnit = await db.unit.update({
+      where: { id: unitId },
+      data: validated,
+      include: {
+        admin: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    // Invalidate cache
+    updateTag(TAGS.UNIT(unitId));
+    updateTag(TAGS.COMPANY(unit.companyId));
+
+    return { success: true, unit: updatedUnit };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Something went wrong";
+    console.error("[Queries] Update Unit Error:", message);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Deletes a Unit and cascades deletion of all associated data.
+ * Only OWNER can delete units.
+ * Cascades: Projects, Phases, Tasks, Lanes, Tags, Clients
+ */
+export async function deleteUnit(unitId: string) {
+  const { userId } = await auth();
+  if (!userId) return { success: false, error: "Unauthorized" };
+
+  try {
+    // Get the unit with company info
+    const unit = await db.unit.findUnique({
+      where: { id: unitId },
+      select: { companyId: true, company: { select: { ownerId: true } } },
+    });
+
+    if (!unit) {
+      return { success: false, error: "Unit not found." };
+    }
+
+    // Only OWNER can delete
+    if (unit.company.ownerId !== userId) {
+      return { success: false, error: "Only the company owner can delete units." };
+    }
+
+    // Get deletion impact summary before deleting
+    const [projectCount, clientCount, memberCount] = await Promise.all([
+      db.project.count({ where: { unitId } }),
+      db.client.count({ where: { unitId } }),
+      db.user.count({ where: { unitId } }),
+    ]);
+
+    // Delete the unit (cascades via schema: Projects, Phases, Tasks, Lanes, Tags, Clients)
+    await db.unit.delete({
+      where: { id: unitId },
+    });
+
+    // Invalidate cache
+    updateTag(TAGS.UNIT(unitId));
+    updateTag(TAGS.COMPANY(unit.companyId));
+
+    return { 
+      success: true, 
+      message: `Unit deleted successfully.`,
+      impact: { projectCount, clientCount, memberCount }
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Something went wrong";
+    console.error("[Queries] Delete Unit Error:", message);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Fetches all units for a company with details.
+ * Used by the units list page.
+ */
+export async function getCompanyUnits(companyId: string) {
+  const { userId } = await auth();
+  if (!userId) return [];
+
+  async function fetchData() {
+    "use cache";
+    cacheTag(TAGS.COMPANY(companyId));
+    cacheLife("minutes");
+
+    return db.unit.findMany({
+      where: { companyId },
+      include: {
+        admin: { select: { id: true, name: true, email: true, avatarUrl: true } },
+        _count: {
+          select: {
+            projects: true,
+            users: true,
+            clients: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  return fetchData();
+}
+
+/**
+ * Fetches a single unit by ID with full details.
+ */
+export async function getUnitById(unitId: string) {
+  const { userId } = await auth();
+  if (!userId) return null;
+
+  async function fetchData() {
+    "use cache";
+    cacheTag(TAGS.UNIT(unitId));
+    cacheLife("minutes");
+
+    return db.unit.findUnique({
+      where: { id: unitId },
+      include: {
+        admin: { select: { id: true, name: true, email: true, avatarUrl: true } },
+        company: { select: { id: true, name: true, ownerId: true } },
+        _count: {
+          select: {
+            projects: true,
+            users: true,
+            clients: true,
+            tasks: true,
+          },
+        },
+      },
+    });
+  }
+
+  return fetchData();
+}
+
+/**
+ * Fetches unit dashboard data for the unit overview page.
+ */
+export async function getUnitDashboardData(unitId: string) {
+  const { userId } = await auth();
+  if (!userId) return null;
+
+  async function fetchData() {
+    "use cache";
+    cacheTag(TAGS.UNIT(unitId));
+    cacheLife("minutes");
+
+    const unit = await db.unit.findUnique({
+      where: { id: unitId },
+      include: {
+        admin: { select: { id: true, name: true, email: true, avatarUrl: true } },
+        company: { select: { id: true, name: true, ownerId: true } },
+        projects: {
+          where: { status: "IN_PROGRESS" },
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            status: true,
+            montantTTC: true,
+          },
+        },
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatarUrl: true,
+            role: true,
+          },
+        },
+        _count: {
+          select: {
+            projects: true,
+            users: true,
+            clients: true,
+            tasks: true,
+          },
+        },
+      },
+    });
+
+    if (!unit) return null;
+
+    // Calculate stats
+    const activeProjects = unit.projects.length;
+    const totalMembers = unit._count.users;
+    const totalClients = unit._count.clients;
+    const totalProjects = unit._count.projects;
+
+    // Calculate total contract value
+    const projectAggregation = await db.project.aggregate({
+      where: { unitId },
+      _sum: { montantTTC: true },
+    });
+
+    return {
+      unit,
+      stats: {
+        activeProjects,
+        totalMembers,
+        totalClients,
+        totalProjects,
+        totalContractValue: projectAggregation._sum.montantTTC || 0,
+      },
+    };
+  }
+
+  return fetchData();
+}
+
+/**
+ * Verifies if the current user can access a unit (OWNER of company or ADMIN of unit).
+ */
+export async function verifyUnitAccess(unitId: string) {
+  const { userId } = await auth();
+  if (!userId) redirect("/company/sign-in");
+
+  const unit = await db.unit.findUnique({
+    where: { id: unitId },
+    select: { 
+      companyId: true, 
+      adminId: true, 
+      company: { select: { ownerId: true } } 
+    },
+  });
+
+  if (!unit) {
+    redirect("/not-found");
+  }
+
+  const isOwner = unit.company.ownerId === userId;
+  const isAdmin = unit.adminId === userId;
+
+  if (!isOwner && !isAdmin) {
+    redirect("/unauthorized");
+  }
+
+  return { 
+    canAccess: true, 
+    isOwner, 
+    isAdmin,
+    companyId: unit.companyId,
+    unitId 
+  };
+}
+
+/**
+ * Fetches eligible users who can be assigned as admin of a new unit.
+ * Excludes users who are already admins of another unit.
+ */
+export async function getEligibleAdmins(companyId: string) {
+  const { userId } = await auth();
+  if (!userId) return [];
+
+  // Only OWNER can access this
+  const company = await db.company.findUnique({
+    where: { id: companyId },
+    select: { ownerId: true },
+  });
+
+  if (!company || company.ownerId !== userId) {
+    return [];
+  }
+
+  // Find users in the company who are not already admins of a unit
+  // Also exclude the company owner (they can't be assigned as unit admin)
+  const eligibleUsers = await db.user.findMany({
+    where: { 
+      companyId,
+      role: { not: "OWNER" },
+      // Exclude users who are already admins
+      administeredUnit: null,
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      avatarUrl: true,
+    },
+    orderBy: { name: "asc" },
+  });
+
+  return eligibleUsers;
+}

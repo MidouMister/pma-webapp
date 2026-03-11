@@ -215,6 +215,11 @@ _Referential integrity is guaranteed by `restrict` and `set null` when retaining
 - `src/app/company/sign-in/[[...sign-in]]/page.tsx` - Clerk Sign In
 - `src/app/company/sign-up/[[...sign-up]]/page.tsx` - Clerk Sign Up
 - `src/app/onboarding/page.tsx` - Initial Auth Flow Onboarding Wizard
+- `src/app/(dashboard)/company/[companyId]/page.tsx` - Company Dashboard
+- `src/app/(dashboard)/company/[companyId]/settings/page.tsx` - Company Settings
+- `src/app/(dashboard)/company/[companyId]/settings/billing/page.tsx` - Billing & Plans
+- `src/app/(dashboard)/company/[companyId]/units/page.tsx` - Units Management
+- `src/app/(dashboard)/unite/[unitId]/page.tsx` - Unit Dashboard
 
 ---
 

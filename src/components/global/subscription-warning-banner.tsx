@@ -121,7 +121,7 @@ export function SubscriptionWarningBanner({
             config.borderColor
           )}
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-white/40 to-white/20 dark:from-white/5 dark:to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-linear-to-r from-white/40 to-white/20 dark:from-white/5 dark:to-transparent pointer-events-none" />
 
           <div className="relative flex items-start gap-4 p-4">
             <div

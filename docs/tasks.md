@@ -623,50 +623,45 @@
 
 ---
 
-## M07 — Unit Management
+## ✅ M07 — Unit Management
 
 - **Goal:** Enable the OWNER to create and manage operational Units, each with an assigned Admin, so that the multi-unit company hierarchy is functional.
 - **Covers PRD Sections:** §6.4 (Unit Management)
-- **Key Deliverables:**
-  - `/company/[companyId]/units` page: unit list with member count, project count, admin name; create/edit/delete controls
-  - OWNER can assign exactly one Admin per Unit
-  - ADMIN can edit their own Unit's profile (name, address, phone, email)
-  - Deleting a Unit cascades deletion of all associated Projects, Phases, Tasks, Lanes, Tags, and Clients
-  - `/unite/[unitId]` unit dashboard with KPIs, recent activity, team summary
-- **Depends On:** M05, M06
-- **Priority:** Must Have
-- **Estimated Complexity:** Medium
+- **Status:** ✅ Complete (2026-03-11)
 
-### Tasks
+- [x] **M07-T01: Build the Units List Page** ✅ 2026-03-11
+  - Created `/company/[companyId]/units` page with unit cards showing name, admin, member count, project count
+  - "Create Unit" button opens dialog with unit creation form
+  - Empty state with CTA when no units exist
+  - Only OWNER can access - uses verifyCompanyOwner()
 
-#### M07-T01 — Build the Units List Page
+- [x] **M07-T02: Implement Unit CRUD Server Actions** ✅ 2026-03-11
+  - Added createUnit(), updateUnit(), deleteUnit() in queries.ts
+  - Plan limit check (maxUnits) before creation
+  - RBAC: OWNER can create/delete any unit, ADMIN can only update their own
+  - deleteUnit() cascades via Prisma schema (Projects, Phases, Tasks, Lanes, Tags, Clients)
+  - Cache invalidation: companyTag(companyId), unitTag(unitId)
 
-- **Type:** UI
-- **Description:** Create the units management page at `/company/[companyId]/units` for the OWNER. Display all units in a responsive card or table layout showing each unit's name, admin name, member count, project count, and creation date. Include "Create Unit" CTA and per-row edit/delete actions.
-- **Acceptance Criteria:**
-  - Route `src/app/(dashboard)/company/[companyId]/units/page.tsx` exists and renders the unit list
-  - Each unit card/row shows: name, admin name, member count, project count
-  - "Create Unit" button opens a dialog/sheet with the unit creation form
-  - Empty state with illustration and CTA when no units exist
-  - Only OWNER can access this route — ADMIN/USER redirected to `/unauthorized`
-- **PRD Reference:** §6.4 (UNIT-06)
-- **Depends On:** M05
-- **Complexity:** M
-- **Touches:** `src/app/(dashboard)/company/[companyId]/units/page.tsx`, `src/lib/queries.ts`
+- [x] **M07-T03: Create Unit Form with Admin Assignment** ✅ 2026-03-11
+  - Created unit-form.tsx with Zod validation
+  - Admin picker shows eligible users (not already admin of another unit)
+  - Uses getEligibleAdmins() to fetch available company members
+  - Edit mode pre-fills existing data
+
+- [x] **M07-T04: Build Unit Dashboard Page** ✅ 2026-03-11
+  - Created `/unite/[unitId]` page with KPI cards
+  - Shows: active projects, members, clients, contract value
+  - Team members overview with avatars
+  - RBAC: OWNER can access any unit, ADMIN can only access their own
+
+- [x] **M07-T05: Implement Unit Delete Confirmation & Cascade Guard** ✅ 2026-03-11
+  - Created unit-delete-dialog.tsx with confirmation input
+  - Shows impact summary (projects, clients, members)
+  - Requires typing unit name to confirm deletion
 
 ---
 
-#### M07-T02 — Implement Unit CRUD Server Actions
-
-- **Type:** Logic
-- **Description:** Create `createUnit()`, `updateUnit()`, and `deleteUnit()` server actions in `src/lib/queries.ts`. Enforce OWNER-only access on create/delete. ADMIN can update only their own unit. Plan limit check (`maxUnits`) before creation. Cascade delete all child entities (Projects, Phases, Tasks, Lanes, Tags, Clients) when a unit is deleted.
-- **Acceptance Criteria:**
-  - `createUnit()` validates Plan.maxUnits limit before INSERT, assigns adminId
-  - `updateUnit()` allows OWNER for any unit, ADMIN for own unit only
-  - `deleteUnit()` cascades deletion of associated Projects, Phases, Tasks, Lanes, Tags, Clients
-  - Cache invalidation: `createUnit` → `companyTag(companyId)`; `updateUnit` → `unitTag(unitId)`; `deleteUnit` → `companyTag(companyId)`, `unitTag(unitId)`
-  - RBAC enforced server-side — never trusted from client
-- **PRD Reference:** §6.4 (UNIT-01, UNIT-02, UNIT-05), §14.5
+## M08 — Team & Invitations
 - **Depends On:** M06-T02
 - **Complexity:** H
 - **Touches:** `src/lib/queries.ts`
