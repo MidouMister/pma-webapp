@@ -19,7 +19,9 @@ import {
   AlertCircle,
   Clock,
   Zap,
-  Sparkles
+  Sparkles,
+  Lock,
+  Calendar
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatAmount, formatDate } from "@/lib/utils";
@@ -57,7 +59,7 @@ const item = {
 };
 
 export function BillingClient({ data }: BillingClientProps) {
-  const { company, subscription, plans, usage } = data;
+  const { company, subscription, plans, usage, daysRemaining, isGracePeriod, isBlocked, subscriptionStatus } = data;
   const currentPlan = subscription?.plan;
   const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<{id: string, name: string} | null>(null);
@@ -108,28 +110,114 @@ export function BillingClient({ data }: BillingClientProps) {
       >
         {/* Current Plan Overview */}
         <motion.div variants={item}>
-          <Card className="glass-morphism border-primary/20 bg-primary/5 shadow-2xl overflow-hidden relative">
+          <Card className={cn(
+            "glass-morphism border shadow-2xl overflow-hidden relative transition-all duration-500",
+            isBlocked 
+              ? "border-rose-500/30 bg-rose-500/5" 
+              : isGracePeriod 
+                ? "border-amber-500/30 bg-amber-500/5"
+                : "border-primary/20 bg-primary/5"
+          )}>
             <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
               <ShieldCheck className="w-32 h-32" />
             </div>
+
+            {/* Countdown Timer Section */}
+            {subscriptionStatus !== "NONE" && (
+              <div className={cn(
+                "px-8 py-4 border-b backdrop-blur-sm",
+                isBlocked 
+                  ? "bg-rose-500/10 border-rose-500/20" 
+                  : isGracePeriod 
+                    ? "bg-amber-500/10 border-amber-500/20"
+                    : "bg-primary/10 border-primary/20"
+              )}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {isBlocked ? (
+                      <div className="w-10 h-10 rounded-xl bg-rose-500/20 flex items-center justify-center">
+                        <Lock className="w-5 h-5 text-rose-500" />
+                      </div>
+                    ) : isGracePeriod ? (
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                        <AlertCircle className="w-5 h-5 text-amber-500" />
+                      </div>
+                    ) : daysRemaining !== null ? (
+                      <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                        <Calendar className="w-5 h-5 text-primary" />
+                      </div>
+                    ) : null}
+                    
+                    <div>
+                      {isBlocked ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-bold text-rose-500">Account Locked</span>
+                          <Badge className="bg-rose-500 text-white border-rose-500 px-2 py-0.5 text-xs font-bold tracking-wider">
+                            READ-ONLY MODE
+                          </Badge>
+                        </div>
+                      ) : isGracePeriod ? (
+                        <span className="text-lg font-bold text-amber-500">
+                          {daysRemaining} {daysRemaining === 1 ? "day" : "days"} remaining in grace period
+                        </span>
+                      ) : daysRemaining !== null ? (
+                        <span className="text-lg font-semibold text-foreground">
+                          {daysRemaining} {daysRemaining === 1 ? "day" : "days"} remaining
+                        </span>
+                      ) : null}
+                      <p className="text-sm text-muted-foreground">
+                        {isBlocked 
+                          ? "Your account has been locked due to payment issues. Contact billing to restore full access."
+                          : isGracePeriod 
+                            ? "Your subscription has expired. Renew now to avoid service interruption."
+                            : "Your subscription is active and in good standing."
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {subscription && !isBlocked && (
+                    <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="w-4 h-4" />
+                      <span>Renews on {formatDate(subscription.endAt)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             
-            <CardHeader className="pb-8">
+            <CardHeader className="pb-8 pt-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <CardTitle className="text-2xl">Current Plan: {currentPlan?.name || "No Plan"}</CardTitle>
                   <CardDescription>
-                    Your subscription is {subscription?.active ? (
+                    Your subscription is {subscriptionStatus === "ACTIVE" ? (
                       <span className="text-emerald-500 font-medium inline-flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3" /> Active
                       </span>
-                    ) : (
+                    ) : subscriptionStatus === "GRACE_PERIOD" ? (
+                      <span className="text-amber-500 font-medium inline-flex items-center gap-1">
+                        <AlertCircle className="w-4 h-4" /> Grace Period
+                      </span>
+                    ) : subscriptionStatus === "BLOCKED" ? (
                       <span className="text-rose-500 font-medium inline-flex items-center gap-1">
-                        <AlertCircle className="w-4 h-4" /> Inactive
+                        <Lock className="w-4 h-4" /> Blocked
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground font-medium inline-flex items-center gap-1">
+                        <AlertCircle className="w-4 h-4" /> No Active Subscription
                       </span>
                     )}
                   </CardDescription>
                 </div>
-                <Badge variant="outline" className="bg-primary/10 border-primary/30 text-primary py-1 px-3">
+                <Badge variant="outline" className={cn(
+                  "py-1 px-3",
+                  isBlocked 
+                    ? "bg-rose-500/10 border-rose-500/30 text-rose-500" 
+                    : isGracePeriod 
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-500"
+                      : "bg-primary/10 border-primary/30 text-primary"
+                )}>
                   {subscription ? (
                     subscription.price === 0 ? "Free Trial" : "Business Account"
                   ) : (
@@ -161,7 +249,13 @@ export function BillingClient({ data }: BillingClientProps) {
                           <motion.div 
                             className={cn(
                               "h-full rounded-full transition-all duration-500",
-                              isDanger ? "bg-rose-500" : isWarning ? "bg-amber-500" : "bg-primary"
+                              isBlocked 
+                                ? "bg-rose-500" 
+                                : isDanger 
+                                  ? "bg-rose-500" 
+                                  : isWarning 
+                                    ? "bg-amber-500" 
+                                    : "bg-primary"
                             )}
                             initial={{ width: 0 }}
                             animate={{ width: `${percentage}%` }}
@@ -173,8 +267,11 @@ export function BillingClient({ data }: BillingClientProps) {
                 })}
               </div>
             </CardContent>
-            {subscription && (
-              <CardFooter className="bg-white/5 border-t border-white/5 p-4 flex items-center justify-between">
+            {subscription && !isBlocked && (
+              <CardFooter className={cn(
+                "border-t p-4 flex items-center justify-between",
+                isGracePeriod ? "bg-amber-500/5 border-amber-500/20" : "bg-white/5 border-white/5"
+              )}>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Clock className="w-4 h-4" />
                   <span>Renews on {formatDate(subscription.endAt)}</span>

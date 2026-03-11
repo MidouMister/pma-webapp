@@ -83,7 +83,7 @@ export function OnboardingStepInvite() {
         invites: values.invites,
       });
 
-      if (result?.success) {
+      if (result?.success && result.companyId) {
         // Clear onboarding state on success
         setCompanyData(null);
         setUnitData(null);
@@ -99,7 +99,7 @@ export function OnboardingStepInvite() {
         
         router.push(`/company/${result.companyId}`);
       } else {
-        setError(result?.error || "Failed to complete onboarding");
+        setError(result?.error || "Failed to complete onboarding - please try again");
         console.error("Failed to complete onboarding:", result?.error);
       }
     } catch (error) {

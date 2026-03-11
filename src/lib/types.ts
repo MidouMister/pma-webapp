@@ -144,4 +144,8 @@ export interface BillingData {
     members: number
     tasks: number
   }
+  daysRemaining: number | null
+  isGracePeriod: boolean
+  isBlocked: boolean
+  subscriptionStatus: "ACTIVE" | "GRACE_PERIOD" | "BLOCKED" | "NONE"
 }

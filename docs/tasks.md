@@ -568,6 +568,7 @@
 
 - **Goal:** Protect company resources by ensuring usage fits within the active plan, while providing the OWNER with tool to monitor and upgrade as needed.
 - **Covers PRD Sections:** §6.3 (Plan Enforcement), §9 (Plan Limits)
+- **Status:** ✅ Complete (2026-03-11)
 
 - [x] **M06-T01: Implement the Billing & Plan Overview Page** ✅ 2026-03-09
   - Create `src/app/(dashboard)/company/[companyId]/settings/billing/page.tsx`
@@ -590,7 +591,7 @@
 
 ---
 
-#### M06-T03 — Develop the "Request Upgrade" Flow
+#### ✅ M06-T03 — Develop the "Request Upgrade" Flow
 
 - **Type:** UI/Logic
 - **Description:** Implement a form to request a plan upgrade. Since payments are offline (bank transfer/check), this form must capture the user's requirements and notify the system (for now, log it or create a "BillingRequest" record if we decide to add it, or simply simulate a success state).
@@ -602,10 +603,11 @@
 - **Depends On:** M06-T01
 - **Complexity:** S
 - **Touches:** `src/components/forms/upgrade-request-form.tsx`, `src/app/(dashboard)/company/[companyId]/settings/billing/page.tsx`
+- **Status:** ✅ Complete (2026-03-11)
 
 ---
 
-#### M06-T04 — Implement Expiry & Grace Period Enforcement
+#### ✅ M06-T04 — Implement Expiry & Grace Period Enforcement
 
 - **Type:** Logic
 - **Description:** Implement the logic to calculate "days remaining" and handle expired subscriptions. Enforce "Read-Only" mode across the dashboard if the subscription is expired AND the grace period has ended.
@@ -617,6 +619,7 @@
 - **Depends On:** M06-T02
 - **Complexity:** M
 - **Touches:** `src/lib/queries.ts`, `src/middleware.ts`
+- **Status:** ✅ Complete (2026-03-11)
 
 ---
 

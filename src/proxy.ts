@@ -1,5 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { db } from "@/lib/db";
 
 const isPublicRoute = createRouteMatcher([
   "/site",
@@ -11,6 +12,18 @@ const isPublicRoute = createRouteMatcher([
 
 const isOnboardingRoute = createRouteMatcher(["/onboarding(.*)"]);
 
+/**
+ * Get user's company ID from database.
+ * This is more reliable than Clerk metadata which can have propagation delays.
+ */
+async function getUserCompanyId(userId: string): Promise<string | null> {
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { companyId: true },
+  });
+  return user?.companyId || null;
+}
+
 export default clerkMiddleware(async (auth, req) => {
   const { userId, sessionClaims, redirectToSignIn } = await auth();
 
@@ -21,13 +34,19 @@ export default clerkMiddleware(async (auth, req) => {
 
   // 2. Handle authenticated users
   if (userId) {
+    // Get companyId from database - more reliable than Clerk metadata
+    const dbCompanyId = await getUserCompanyId(userId);
+    
+    // Also check Clerk metadata as fallback
     const metadata = sessionClaims?.metadata as {
       role?: string;
       companyId?: string;
     } | undefined;
-
+    const metadataCompanyId = metadata?.companyId;
     const role = metadata?.role;
-    const companyId = metadata?.companyId;
+
+    // Use DB companyId if available, otherwise fall back to metadata
+    const companyId = dbCompanyId || metadataCompanyId;
 
     // A. If already on onboarding, let them finish
     if (isOnboardingRoute(req)) {
@@ -47,7 +66,7 @@ export default clerkMiddleware(async (auth, req) => {
 
     // C. Dashboard redirection for Root / Generic paths
     if (req.nextUrl.pathname === "/" && companyId) {
-      if (role === "OWNER") {
+      if (role === "OWNER" || dbCompanyId) {
         return NextResponse.redirect(new URL(`/company/${companyId}`, req.url));
       }
       // Future: ADMIN -> /unite/[unitId], USER -> /user/[userId]

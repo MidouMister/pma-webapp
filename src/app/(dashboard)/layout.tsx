@@ -2,6 +2,7 @@
 
 import { Sidebar } from "@/components/global/sidebar";
 import { Header } from "@/components/global/header";
+import { SubscriptionBannerWrapper } from "@/components/global/subscription-banner-wrapper";
 import { useAtomValue } from "jotai";
 import { sidebarCollapsedAtom } from "@/store/atoms";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,9 @@ export default function DashboardLayout({
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header - fixed top navigation */}
         <Header />
+
+        {/* Subscription Warning Banner */}
+        <SubscriptionBannerWrapper />
 
         {/* Dynamic Page Content */}
         <motion.main

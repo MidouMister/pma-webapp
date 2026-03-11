@@ -15,6 +15,18 @@ const clerkClient = createClerkClient({
 });
 
 /**
+ * Enforces active (non-blocked) subscription before mutations.
+ * Should be called AFTER authentication but BEFORE any database mutation.
+ * @throws Error if subscription is blocked or inactive
+ */
+async function enforceActiveSubscription(companyId: string) {
+    const { isBlocked } = await getSubscriptionStatus(companyId);
+    if (isBlocked) {
+        throw new Error("Your subscription has expired. Please upgrade to continue.");
+    }
+}
+
+/**
  * Single source of truth for all database queries and mutations.
  * This ensures consistency and makes it easier to optimize queries.
  * 
@@ -319,6 +331,8 @@ export async function updateCompany(companyId: string, values: z.infer<typeof co
       return { success: false, error: "Access denied. Only the owner can update company settings." };
     }
 
+    await enforceActiveSubscription(companyId);
+
     const validated = companyUpdateSchema.parse(values);
 
     await db.company.update({
@@ -382,6 +396,18 @@ export async function getCompanyBillingData(companyId: string) {
       _count: { id: true },
     });
 
+    // Get subscription status for billing enforcement
+    const subscriptionStatus = await getSubscriptionStatus(companyId);
+
+    // Calculate days remaining
+    let daysRemaining: number | null = null;
+    if (subscriptionStatus.status !== "NONE" && subscriptionStatus.endAt) {
+      const endAt = new Date(subscriptionStatus.endAt);
+      const now = new Date();
+      const diffTime = endAt.getTime() - now.getTime();
+      daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+
     return {
       company,
       subscription: company.subscriptions[0] || null,
@@ -392,6 +418,10 @@ export async function getCompanyBillingData(companyId: string) {
         members: company._count.users,
         tasks: taskAggregation._count.id,
       },
+      daysRemaining,
+      isGracePeriod: subscriptionStatus.isGracePeriod,
+      isBlocked: subscriptionStatus.isBlocked,
+      subscriptionStatus: subscriptionStatus.status as "ACTIVE" | "GRACE_PERIOD" | "BLOCKED" | "NONE",
     };
   }
 
@@ -435,6 +465,46 @@ export async function getSubscriptionStatus(companyId: string) {
     isBlocked,
     plan: subscription.plan,
     endAt: subscription.endAt,
+  };
+}
+
+/**
+ * Server action to get the current user's subscription status.
+ * Can be called from client components.
+ */
+export async function getCurrentUserSubscriptionStatus(): Promise<{
+  daysRemaining: number | null;
+  isGracePeriod: boolean;
+  isBlocked: boolean;
+  status: "ACTIVE" | "GRACE_PERIOD" | "BLOCKED" | "NONE";
+  companyId: string | null;
+} | null> {
+  const { userId } = await auth();
+  if (!userId) return null;
+
+  const dbUser = await db.user.findUnique({
+    where: { id: userId },
+    select: { companyId: true },
+  });
+
+  if (!dbUser?.companyId) return null;
+
+  const subStatus = await getSubscriptionStatus(dbUser.companyId);
+
+  let daysRemaining: number | null = null;
+  if (subStatus.endAt) {
+    const now = new Date();
+    const endAt = new Date(subStatus.endAt);
+    const diffTime = endAt.getTime() - now.getTime();
+    daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  }
+
+  return {
+    daysRemaining,
+    isGracePeriod: subStatus.isGracePeriod,
+    isBlocked: subStatus.isBlocked,
+    status: subStatus.status as "ACTIVE" | "GRACE_PERIOD" | "BLOCKED" | "NONE",
+    companyId: dbUser.companyId,
   };
 }
 
@@ -513,6 +583,8 @@ export async function requestUpgrade(values: z.infer<typeof upgradeRequestSchema
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
+    await enforceActiveSubscription(companyId);
+
     const validated = upgradeRequestSchema.parse(values);
     
     // In a real application, we would send an email to the platform operator here.
