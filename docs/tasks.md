@@ -754,34 +754,35 @@
 
 ---
 
-## M09 — Client CRM
+## ✅ M09 — Client CRM
 
 - **Goal:** Provide unit-scoped client management so that ADMINs can track their clients and link them to projects.
 - **Covers PRD Sections:** §6.6 (Client CRM)
-- **Key Deliverables:**
-  - `/unite/[unitId]/clients` page: client list with search by name, sort by name / total TTC
-  - ADMIN or OWNER can create, edit, and delete Clients (fields: name, wilaya, phone, email)
-  - Client profile page showing: contact details, linked projects, total TTC contract value
-  - USERs can view client info read-only for clients linked to their assigned projects
-  - Deletion guard: cannot delete a Client with active (InProgress) projects
-- **Depends On:** M07
-- **Priority:** Must Have
-- **Estimated Complexity:** Medium
+- **Status:** ✅ Complete (2026-03-12)
 
-### Tasks
+- [x] **M09-T01: Implement Client CRUD Server Actions** ✅ 2026-03-12
+  - Created `createClient()`, `updateClient()`, `deleteClient()` in queries.ts
+  - Added validation schemas, helper functions (authenticateClientAdmin, verifyClientAccess)
+  - Implemented active project guard for deletion
+  - Cache invalidation for UNIT_CLIENTS and CLIENT tags
 
-#### M09-T01 — Implement Client CRUD Server Actions
+- [x] **M09-T02: Build Client List Page** ✅ 2026-03-12
+  - Created `/unite/[unitId]/clients/page.tsx` with search and sort
+  - Implemented debounced search by name/wilaya/email
+  - Sort by name or total TTC ascending/descending
+  - RBAC: ADMIN/OWNER full CRUD, USER read-only for linked projects
 
-- **Type:** Logic
-- **Description:** Create `createClient()`, `updateClient()`, and `deleteClient()` server actions in `src/lib/queries.ts`. Enforce unit-scoping and RBAC (ADMIN/OWNER only). Deletion guard: block deletion if the client has any projects with status `InProgress`.
-- **Acceptance Criteria:**
-  - `createClient()` creates a client scoped to the unit/company
-  - `updateClient()` validates ADMIN/OWNER access
-  - `deleteClient()` checks for active projects and returns an error if any exist
-  - Cache invalidation: `unitClientsTag(unitId)` on all mutations
-  - Client name uniqueness enforced within unit scope
-- **PRD Reference:** §6.6 (CLT-01 through CLT-07), §14.5
-- **Depends On:** M07
+- [x] **M09-T03: Create Client Form** ✅ 2026-03-12
+  - Created `client-form.tsx` with Zod validation
+  - Shared form for Create and Edit modes
+  - Uses shadcn/ui Dialog with glassmorphism styling
+
+- [x] **M09-T04: Build Client Profile Page** ✅ 2026-03-12
+  - Created `/unite/[unitId]/clients/[clientId]/page.tsx`
+  - Contact details card with icons
+  - Linked projects list with status badges
+  - Total TTC contract value summary
+  - Delete guard with active project check
 - **Complexity:** M
 - **Touches:** `src/lib/queries.ts`
 

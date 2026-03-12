@@ -34,7 +34,7 @@ export default function DashboardLayout({
             marginLeft: collapsed ? "80px" : "260px" 
           }}
           className={cn(
-            "flex-1 pt-16 transition-all duration-300 ease-in-out px-6 py-6 overflow-y-auto no-scrollbar",
+            "flex-1 mt-10 pt-16 transition-all duration-300 ease-in-out px-6 py-6 overflow-y-auto no-scrollbar",
             "bg-[radial-gradient(ellipse_at_top_right,var(--primary-foreground)_0%,transparent_50%)]",
             "dark:bg-[radial-gradient(ellipse_at_top_right,rgba(var(--primary-rgb),0.05)_0%,transparent_50%)]"
           )}

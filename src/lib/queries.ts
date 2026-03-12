@@ -1734,3 +1734,503 @@ export async function removeTeamMember(projectId: string, userId: string) {
     return { success: false, error: message };
   }
 }
+
+// ============================================================================
+// M09 - Client CRM Server Actions
+// ============================================================================
+
+const createClientSchema = z.object({
+  unitId: z.string().uuid("Invalid unit ID"),
+  name: z.string().min(1, "Client name is required"),
+  wilaya: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().email("Invalid email").optional().or(z.literal("")),
+});
+
+const updateClientSchema = z.object({
+  name: z.string().min(1, "Client name is required").optional(),
+  wilaya: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().email("Invalid email").optional().or(z.literal("")),
+});
+
+/**
+ * Authenticates that the current user is ADMIN of the unit or OWNER of the company.
+ */
+async function authenticateClientAdmin(clientId: string) {
+  const { userId: currentUserId } = await auth();
+  if (!currentUserId) {
+    throw new Error("Unauthorized");
+  }
+
+  const client = await db.client.findUnique({
+    where: { id: clientId },
+    select: {
+      unitId: true,
+      unit: {
+        select: {
+          companyId: true,
+          adminId: true,
+          company: {
+            select: { ownerId: true }
+          }
+        }
+      }
+    },
+  });
+
+  if (!client) {
+    throw new Error("Client not found");
+  }
+
+  const isOwner = client.unit.company.ownerId === currentUserId;
+  const isAdmin = client.unit.adminId === currentUserId;
+
+  if (!isOwner && !isAdmin) {
+    throw new Error("Access denied. Only ADMIN or OWNER can manage clients.");
+  }
+
+  return {
+    userId: currentUserId,
+    unitId: client.unitId,
+    companyId: client.unit.companyId,
+    isOwner,
+    isAdmin,
+  };
+}
+
+/**
+ * Verifies user can access the client.
+ * - ADMIN/OWNER can access all clients in their unit/company
+ * - USER can only access clients linked to their assigned projects
+ */
+export async function verifyClientAccess(clientId: string, userId: string) {
+  const client = await db.client.findUnique({
+    where: { id: clientId },
+    select: {
+      unitId: true,
+      unit: {
+        select: {
+          companyId: true,
+          adminId: true,
+          company: {
+            select: { ownerId: true }
+          }
+        }
+      }
+    },
+  });
+
+  if (!client) {
+    return { canAccess: false, reason: "Client not found" };
+  }
+
+  const isOwner = client.unit.company.ownerId === userId;
+  const isAdmin = client.unit.adminId === userId;
+
+  if (isOwner || isAdmin) {
+    return { canAccess: true, unitId: client.unitId, companyId: client.unit.companyId };
+  }
+
+  // For regular users, check if they have a project linked to this client
+  const userProject = await db.project.findFirst({
+    where: {
+      clientId,
+      team: {
+        members: {
+          some: { userId }
+        }
+      }
+    },
+    select: { id: true },
+  });
+
+  if (userProject) {
+    return { canAccess: true, unitId: client.unitId, companyId: client.unit.companyId };
+  }
+
+  return { canAccess: false, reason: "You don't have access to this client" };
+}
+
+/**
+ * Gets all projects linked to a client.
+ */
+export async function getClientProjects(clientId: string) {
+  return db.project.findMany({
+    where: { clientId },
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      status: true,
+      montantTTC: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+/**
+ * Creates a new Client for a unit.
+ * - Validates unit access (user must be ADMIN of the unit or OWNER of the company)
+ * - Enforces active subscription
+ * - Checks client name uniqueness within unit scope
+ */
+export async function createClient(data: {
+  unitId: string;
+  name: string;
+  wilaya?: string;
+  phone?: string;
+  email?: string;
+}) {
+  const { userId } = await auth();
+  if (!userId) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    // Verify unit access
+    const unit = await db.unit.findUnique({
+      where: { id: data.unitId },
+      select: {
+        companyId: true,
+        adminId: true,
+        company: { select: { ownerId: true } },
+      },
+    });
+
+    if (!unit) {
+      return { success: false, error: "Unit not found" };
+    }
+
+    const isOwner = unit.company.ownerId === userId;
+    const isAdmin = unit.adminId === userId;
+
+    if (!isOwner && !isAdmin) {
+      return { success: false, error: "Only ADMIN or OWNER can create clients" };
+    }
+
+    // Enforce active subscription
+    await enforceActiveSubscription(unit.companyId);
+
+    // Validate input
+    const validated = createClientSchema.parse(data);
+
+    // Check client name uniqueness within unit
+    const existingClient = await db.client.findFirst({
+      where: {
+        name: { equals: validated.name, mode: "insensitive" },
+        unitId: validated.unitId,
+      },
+    });
+
+    if (existingClient) {
+      return { success: false, error: "A client with this name already exists in this unit" };
+    }
+
+    // Check email uniqueness if provided
+    if (validated.email) {
+      const existingEmail = await db.client.findFirst({
+        where: {
+          email: { equals: validated.email, mode: "insensitive" },
+          unitId: validated.unitId,
+        },
+      });
+
+      if (existingEmail) {
+        return { success: false, error: "A client with this email already exists in this unit" };
+      }
+    }
+
+    // Create the client
+    const client = await db.client.create({
+      data: {
+        name: validated.name,
+        wilaya: validated.wilaya,
+        phone: validated.phone,
+        email: validated.email || null,
+        unitId: validated.unitId,
+      },
+    });
+
+    // Invalidate cache
+    updateTag(TAGS.UNIT_CLIENTS(validated.unitId));
+
+    return { success: true, client };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Something went wrong";
+    console.error("[Queries] Create Client Error:", message);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Updates an existing Client.
+ * - Validates user is ADMIN of the unit or OWNER of the company
+ * - Enforces active subscription
+ * - Updates only provided fields
+ */
+export async function updateClient(data: {
+  clientId: string;
+  name?: string;
+  wilaya?: string;
+  phone?: string;
+  email?: string;
+}) {
+  const { userId } = await auth();
+  if (!userId) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    // Authenticate and get client context
+    const { unitId, companyId } = await authenticateClientAdmin(data.clientId);
+
+    // Enforce active subscription
+    await enforceActiveSubscription(companyId);
+
+    // Validate input
+    const validated = updateClientSchema.parse(data);
+
+    // Check name uniqueness if provided
+    if (validated.name) {
+      const existingClient = await db.client.findFirst({
+        where: {
+          name: { equals: validated.name, mode: "insensitive" },
+          unitId,
+          id: { not: data.clientId },
+        },
+      });
+
+      if (existingClient) {
+        return { success: false, error: "A client with this name already exists in this unit" };
+      }
+    }
+
+    // Check email uniqueness if provided
+    if (validated.email) {
+      const existingEmail = await db.client.findFirst({
+        where: {
+          email: { equals: validated.email, mode: "insensitive" },
+          unitId,
+          id: { not: data.clientId },
+        },
+      });
+
+      if (existingEmail) {
+        return { success: false, error: "A client with this email already exists in this unit" };
+      }
+    }
+
+    // Update the client
+    const client = await db.client.update({
+      where: { id: data.clientId },
+      data: {
+        ...(validated.name && { name: validated.name }),
+        ...(validated.wilaya !== undefined && { wilaya: validated.wilaya }),
+        ...(validated.phone !== undefined && { phone: validated.phone }),
+        ...(validated.email !== undefined && { email: validated.email || null }),
+      },
+    });
+
+    // Invalidate cache
+    updateTag(TAGS.CLIENT(data.clientId));
+    updateTag(TAGS.UNIT_CLIENTS(unitId));
+
+    return { success: true, client };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Something went wrong";
+    console.error("[Queries] Update Client Error:", message);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Deletes a Client.
+ * - Validates user is ADMIN of the unit or OWNER of the company
+ * - Checks for active projects before deletion
+ */
+export async function deleteClient(data: { clientId: string }) {
+  const { userId } = await auth();
+  if (!userId) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  try {
+    // Authenticate and get client context
+    const { unitId, companyId } = await authenticateClientAdmin(data.clientId);
+
+    // Check for active projects
+    const activeProjects = await db.project.count({
+      where: {
+        clientId: data.clientId,
+        status: "IN_PROGRESS",
+      },
+    });
+
+    if (activeProjects > 0) {
+      return { success: false, error: "Cannot delete client with active projects" };
+    }
+
+    // Delete the client
+    await db.client.delete({
+      where: { id: data.clientId },
+    });
+
+    // Invalidate cache
+    updateTag(TAGS.CLIENT(data.clientId));
+    updateTag(TAGS.UNIT_CLIENTS(unitId));
+
+    return { success: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Something went wrong";
+    console.error("[Queries] Delete Client Error:", message);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Fetches a client by ID with company/unit scoping.
+ */
+export async function getClientById(clientId: string) {
+  const { userId } = await auth();
+  if (!userId) return null;
+
+  async function fetchData() {
+    "use cache";
+    cacheTag(TAGS.CLIENT(clientId));
+    cacheLife("minutes");
+
+    const client = await db.client.findUnique({
+      where: { id: clientId },
+      include: {
+        unit: {
+          select: {
+            id: true,
+            name: true,
+            company: {
+              select: { id: true, name: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!client) return null;
+
+    // Check access
+    const userIdValue = userId as string;
+    const access = await verifyClientAccess(clientId, userIdValue);
+    if (!access.canAccess) return null;
+
+    return client;
+  }
+
+  return fetchData();
+}
+
+/**
+ * Fetches all clients for a unit.
+ * Optionally includes project count and total TTC.
+ */
+export async function getUnitClients(unitId: string, includeStats = false) {
+  const { userId } = await auth();
+  if (!userId) return [];
+
+  async function fetchData() {
+    "use cache";
+    cacheTag(TAGS.UNIT_CLIENTS(unitId));
+    cacheLife("hours");
+
+    const clients = await db.client.findMany({
+      where: { unitId },
+      select: {
+        id: true,
+        name: true,
+        wilaya: true,
+        phone: true,
+        email: true,
+        createdAt: true,
+        updatedAt: true,
+        ...(includeStats && {
+          _count: {
+            select: { projects: true },
+          },
+          projects: {
+            select: { montantTTC: true },
+          },
+        }),
+      },
+      orderBy: { name: "asc" },
+    });
+
+    if (!includeStats) return clients;
+
+    return clients.map((client) => ({
+      ...client,
+      projectCount: client._count?.projects || 0,
+      totalTTC: client.projects.reduce((sum, p) => sum + (p.montantTTC || 0), 0),
+    }));
+  }
+
+  return fetchData();
+}
+
+/**
+ * Fetches a client with all linked projects.
+ * Includes project name, status, montantTTC.
+ * Calculates total TTC contract value.
+ */
+export async function getClientWithProjects(clientId: string) {
+  const { userId: authUserId } = await auth();
+  if (!authUserId) return null;
+
+  async function fetchData() {
+    "use cache";
+    cacheTag(TAGS.CLIENT(clientId));
+    cacheLife("minutes");
+
+    const client = await db.client.findUnique({
+      where: { id: clientId },
+      include: {
+        unit: {
+          select: {
+            id: true,
+            name: true,
+            company: {
+              select: { id: true, name: true },
+            },
+          },
+        },
+        projects: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            status: true,
+            montantTTC: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    });
+
+    if (!client) return null;
+
+    // Check access
+    const userIdValue = authUserId as string;
+    const access = await verifyClientAccess(clientId, userIdValue);
+    if (!access.canAccess) return null;
+
+    const totalTTC = client.projects.reduce((sum, p) => sum + (p.montantTTC || 0), 0);
+
+    return {
+      ...client,
+      totalTTC,
+      projectCount: client.projects.length,
+    };
+  }
+
+  return fetchData();
+}

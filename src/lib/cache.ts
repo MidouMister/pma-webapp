@@ -11,6 +11,7 @@ export const TAGS = {
   TASK: (id: string) => `task:${id}`,
   USER: (id: string) => `user:${id}`,
   CLIENT: (id: string) => `client:${id}`,
+  UNIT_CLIENTS: (unitId: string) => `unit-clients:${unitId}`,
   NOTIFICATIONS: (userId: string) => `notifications:${userId}`,
   ACTIVITY: (id: string) => `activity:${id}`,
   INVITATION: (id: string) => `invitation:${id}`,

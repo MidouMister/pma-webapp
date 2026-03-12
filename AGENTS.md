@@ -1,6 +1,6 @@
 # AGENTS.md — PMA Project Reference
 
-> **Generated:** 2026-03-08 · **PRD Version:** 1.0.0 · **Codebase Snapshot:** Foundation Implemented (M01 Complete)
+> **Generated:** 2026-03-08 · **PRD Version:** 1.0.0 · **Codebase Snapshot:** M09 Complete (Client CRM)
 
 ---
 
@@ -222,6 +222,8 @@ _Referential integrity is guaranteed by `restrict` and `set null` when retaining
 - `src/app/(dashboard)/company/[companyId]/team/page.tsx` - Company Team & Invitations
 - `src/app/(dashboard)/unite/[unitId]/page.tsx` - Unit Dashboard
 - `src/app/(dashboard)/unite/[unitId]/users/page.tsx` - Unit Members Management
+- `src/app/(dashboard)/unite/[unitId]/clients/page.tsx` - Client List (CRM)
+- `src/app/(dashboard)/unite/[unitId]/clients/[clientId]/page.tsx` - Client Profile
 
 ---
 
@@ -249,5 +251,39 @@ _Referential integrity is guaranteed by `restrict` and `set null` when retaining
 | 📌 Font choice        | Codebase uses Geist fonts (Next.js default). PRD doesn't specify typography. Decision needed.               | Open         |
 
 ---
+
+## 11. Always Read Project Context First
+
+Before writing any code, making any edit, or executing any task, you MUST read
+the following files if they exist in the project root — in this order:
+
+1. @AGENTS.md — architecture, conventions, business rules, and constraints
+2. docs/@tasks.md — current milestone and task status
+3. docs/@PRD.md — product specification and functional requirements
+
+Never assume you already know the project context from a previous message.
+Re-read these files at the start of every new task.
+If any of these files is missing, stop and notify the user before proceeding.
+
+---
+
+## 12. Always Use Available Skills
+
+Before writing any code, check which skills are installed in the project.
+Apply every relevant skill — do not cherry-pick.
+Skills are not optional — they encode the project's quality standards.
+
+Mandatory application rules:
+
+- React Best Practices skill → apply to every component, hook, and state file
+- Frontend Design skill → apply to every UI element, layout, and styling decision
+- Any other installed skill → apply whenever its domain is touched
+- If a skill conflicts with a task instruction, apply the skill and flag the conflict
+
+---
+
+## 13. Always Use Available MCPs
+
+You have access to MCP tools. Use them actively — do not ignore them.
 
 _End of AGENTS.md — Updated 2026-03-08 after Milestone M01 completion._
